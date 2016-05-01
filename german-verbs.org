@@ -1,0 +1,4993 @@
+#+STARTUP: overview
+#+STARTUP: hidestars
+#+TAGS: drill(c)
+
+* 
+#+BEGIN_SRC emacs-lisp
+
+((defun org-drill-get-verb-conjugation-info ()
+  "Auxiliary function used by `org-drill-present-verb-conjugation' and
+`org-drill-show-answer-verb-conjugation'."
+  (let ((infinitive (org-entry-get (point) "VERB_INFINITIVE" t))
+        (inf-hint (org-entry-get (point) "VERB_INFINITIVE_HINT" t))
+        (translation (org-entry-get (point) "VERB_TRANSLATION" t))
+        (tense (org-entry-get (point) "VERB_TENSE" nil))
+        (mood (org-entry-get (point) "VERB_MOOD" nil))
+        (highlight-face nil))
+    (unless (and infinitive translation (or tense mood))
+      (error "Missing information for verb conjugation card (%s, %s, %s, %s) at %s"
+             infinitive translation tense mood (point)))
+    (setq tense (if tense (downcase (car (read-from-string tense))))
+          mood (if mood (downcase (car (read-from-string mood))))
+          infinitive (car (read-from-string infinitive))
+          inf-hint (if inf-hint (car (read-from-string inf-hint)))
+          translation (car (read-from-string translation)))
+    (setq highlight-face
+          (list :foreground
+                (or (second (assoc-string tense org-drill-verb-tense-alist t))
+                    "hotpink")
+                :background
+                (second (assoc-string mood org-drill-verb-tense-alist t))))
+    (setq infinitive (propertize infinitive 'face highlight-face))
+    (setq translation (propertize translation 'face highlight-face))
+    (if tense (setq tense (propertize tense 'face highlight-face)))
+    (if mood (setq mood (propertize mood 'face highlight-face)))
+    (list infinitive inf-hint translation tense mood)))
+
+
+(defun org-drill-present-verb-conjugation ()
+  "Present a drill entry whose card type is 'conjugate'."
+  (cl-flet ((tense-and-mood-to-string
+             (tense mood)
+             (cond
+              ((and tense mood)
+               (format "%s tense, %s mood" tense mood))
+              (tense
+               (format "%s tense" tense))
+              (mood
+               (format "%s mood" mood)))))
+    (destructuring-bind (infinitive inf-hint translation tense mood)
+        (org-drill-get-verb-conjugation-info)
+      (org-drill-present-card-using-text
+       (cond
+        ((zerop (random* 2))
+         (format "\nTranslate the verb\n\n%s\n\nand conjugate for the %s.\n\n"
+                 infinitive (tense-and-mood-to-string tense mood)))
+
+        (t
+         (format "\nGive the verb that means\n\n%s %s\n
+and conjugate for the %s.\n\n"
+                 translation
+                 (if inf-hint (format "  [HINT: %s]" inf-hint) "")
+                 (tense-and-mood-to-string tense mood))))))))
+
+
+(defun org-drill-show-answer-verb-conjugation (reschedule-fn)
+  "Show the answer for a drill item whose card type is 'conjugate'.
+RESCHEDULE-FN must be a function that calls `org-drill-reschedule' and
+returns its return value."
+  (destructuring-bind (infinitive inf-hint translation tense mood)
+      (org-drill-get-verb-conjugation-info)
+    (with-replaced-entry-heading
+     (format "%s of %s ==> %s\n\n"
+             (capitalize
+              (cond
+               ((and tense mood)
+                (format "%s tense, %s mood" tense mood))
+               (tense
+                (format "%s tense" tense))
+               (mood
+                (format "%s mood" mood))))
+             infinitive translation)
+     (org-cycle-hide-drawers 'all)
+     (funcall reschedule-fn))))
+
+defun org-drill-present-spanish-verb ()
+  (let ((prompt nil)
+        (reveal-headings nil))
+    (with-hidden-comments
+     (with-hidden-cloze-hints
+      (with-hidden-cloze-text
+       (case (random* 6)
+         (0
+          (org-drill-hide-all-subheadings-except '("Infinitive"))
+          (setq prompt
+                (concat "Translate this German verb, and conjugate it "
+                        "for the *present* tense.")
+                reveal-headings '("English" "Particip II" )))
+         (1
+          (org-drill-hide-all-subheadings-except '("English"))
+          (setq prompt (concat "For the *present* tense, conjugate the "
+                               "Spanish translation of this English verb.")
+                reveal-headings '("Infinitive" "Present Tense" "Notes")))
+         (2
+          (org-drill-hide-all-subheadings-except '("Infinitive"))
+          (setq prompt (concat "Translate this Spanish verb, and "
+                               "conjugate it for the *past* tense.")
+                reveal-headings '("English" "Past Tense" "Notes")))
+         (3
+          (org-drill-hide-all-subheadings-except '("English"))
+          (setq prompt (concat "For the *past* tense, conjugate the "
+                               "Spanish translation of this English verb.")
+                reveal-headings '("Infinitive" "Past Tense" "Notes")))
+         (4
+          (org-drill-hide-all-subheadings-except '("Infinitive"))
+          (setq prompt (concat "Translate this Spanish verb, and "
+                               "conjugate it for the *future perfect* tense.")
+                reveal-headings '("English" "Future Perfect Tense" "Notes")))
+         (5
+          (org-drill-hide-all-subheadings-except '("English"))
+          (setq prompt (concat "For the *future perfect* tense, conjugate the "
+                               "Spanish translation of this English verb.")
+                reveal-headings '("Infinitive" "Future Perfect Tense" "Notes"))))
+       (org-cycle-hide-drawers 'all)
+       (prog1 (org-drill-presentation-prompt)
+         (org-drill-hide-subheadings-if 'org-drill-entry-p)))))))
+
+#+END_SRC
+* Verbix API
+3218c880-f5d9-11e5-be88-00089be4dcbc
+* Getting umlauts and ß
+- C-x 8 " "	¨
+- C-x 8 " A	Ä
+- C-x 8 " E	Ë
+- C-x 8 " I	Ï
+- C-x 8 " O	Ö
+- C-x 8 " U	Ü
+- C-x 8 " a	ä
+- C-x 8 " e	ë
+- C-x 8 " i	ï
+- C-x 8 " o	ö
+- C-x 8 " s	ß
+- C-x 8 " u	ü
+
+* Different Card Types
+  1) simple" org-drill-present-simple-card
+  2) twosided" org-drill-present-two-sided-card nil t)
+  3) multisided" org-drill-present-multi-sided-card nil t)
+  4) hide1cloze" org-drill-present-multicloze-hide1)
+  5) hide2cloze" org-drill-present-multicloze-hide2)
+  6) show1cloze" org-drill-present-multicloze-show1)
+  7) show2cloze" org-drill-present-multicloze-show2)
+  8) multicloze" org-drill-present-multicloze-hide1)
+  9) hidefirst" org-drill-present-multicloze-hide-first)
+  10) hidelast" org-drill-present-multicloze-hide-last)
+  11) hide1_firstmore" org-drill-present-multicloze-hide1-firstmore)
+  12) show1_lastmore" org-drill-present-multicloze-show1-lastmore)
+  13) show1_firstless" org-drill-present-multicloze-show1-firstless)
+  14) conjugate" org-drill-present-verb-conjugation org-drill-show-answer-verb-conjugation)
+  15) decline_noun" org-drill-present-noun-declension org-drill-show-answer-noun-declension)
+  16) spanish_verb" org-drill-present-spanish-verb)
+  17) translate_number" org-drill-present-translate-number))
+* Verbs
+  :PROPERTIES:
+  :ID:       9a95c573-6c34-4b96-96ca-2e0db59ce4ec
+  :END:
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "sein"
+:VERB_TRANSLATION: "have--auxiliary used in forming the perfect and the past perfect tenses"
+:ID:       9d710e60-f7df-46be-95f0-8bef4b732649
+:END:
+*** 	 :drill:
+    SCHEDULED: <2016-04-17 Sun>
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       4d3fdaa3-509a-4a4e-97ea-127057f77d2c
+:DRILL_LAST_INTERVAL: 4.1257
+:DRILL_REPEATS_SINCE_FAIL: 2
+:DRILL_TOTAL_REPEATS: 1
+:DRILL_FAILURE_COUNT: 0
+:DRILL_AVERAGE_QUALITY: 5.0
+:DRILL_EASE: 2.6
+:DRILL_LAST_QUALITY: 5
+:DRILL_LAST_REVIEWED: [2016-04-13 Wed 20:47]
+:END:
+|ich|bin|
+|du|bist|
+|er|ist|
+|wir|sind|
+|ihr|seid|
+|sie|sind|
+|Sie|sind|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       fcbbe52a-f7e0-4263-b3a3-33e1a12a1c4a
+:END:
+|ich|bin gewesen|
+|du|bist gewesen|
+|er|ist gewesen|
+|wir|sind gewesen|
+|ihr|seid gewesen|
+|sie|sind gewesen|
+|Sie|sind gewesen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       989a3da9-f816-4782-b222-9852a48daf20
+:END:
+|ich|war|
+|du|warst|
+|er|war|
+|wir|waren|
+|ihr|wart|
+|sie|waren|
+|Sie|waren|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "scheinen"
+:VERB_TRANSLATION: "look;beam;shine;strike;seem--to appear, to seem"
+:ID:       a073327c-d882-4ff4-bc93-7c63990c682c
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       eec28d4d-f0cb-447a-8012-2c30951bb25f
+:END:
+|ich|scheine|
+|du|scheinst|
+|er|scheint|
+|wir|scheinen|
+|ihr|scheint|
+|sie|scheinen|
+|Sie|scheinen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       69af9613-118f-46ec-84a0-7c30f49f0b75
+:END:
+|ich|habe geschienen|
+|du|hast geschienen|
+|er|hat geschienen|
+|wir|haben geschienen|
+|ihr|habt geschienen|
+|sie|haben geschienen|
+|Sie|haben geschienen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       965969a6-3495-4931-b698-0c45dff761d0
+:END:
+|ich|schien|
+|du|schienst|
+|er|schien|
+|wir|schienen|
+|ihr|schient|
+|sie|schienen|
+|Sie|schienen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "haben"
+:VERB_TRANSLATION: "have;have;have;have--to possess"
+:ID:       ea0f9845-865d-4074-8a53-f5fdb4660fe2
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       4f05c1dc-19f3-4651-8c5c-e236e7778f58
+:END:
+|ich|habe|
+|du|hast|
+|er|hat|
+|wir|haben|
+|ihr|habt|
+|sie|haben|
+|Sie|haben|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       5343c225-19fb-4bcf-b964-193d806f1347
+:END:
+|ich|habe gehabt|
+|du|hast gehabt|
+|er|hat gehabt|
+|wir|haben gehabt|
+|ihr|habt gehabt|
+|sie|haben gehabt|
+|Sie|haben gehabt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       3cee3bc2-4bb1-48bb-8b44-fa647c2239dd
+:END:
+|ich|hatte|
+|du|hattest|
+|er|hatte|
+|wir|hatten|
+|ihr|hattet|
+|sie|hatten|
+|Sie|hatten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "kommen"
+:VERB_TRANSLATION: "cum;stem;come;come;come;arrive;jizz;succor--slang: have an orgasm; ejaculate"
+:ID:       0b7cd562-8623-46fc-b330-de9c27a88939
+:END:
+*** 	 :drill:
+    SCHEDULED: <2016-04-21 Thu>
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       dad69698-62d0-4c8e-b389-4b0c27e2846e
+:DRILL_LAST_INTERVAL: 4.748
+:DRILL_REPEATS_SINCE_FAIL: 2
+:DRILL_TOTAL_REPEATS: 1
+:DRILL_FAILURE_COUNT: 0
+:DRILL_AVERAGE_QUALITY: 5.0
+:DRILL_EASE: 2.6
+:DRILL_LAST_QUALITY: 5
+:DRILL_LAST_REVIEWED: [2016-04-16 Sat 18:52]
+:END:
+|ich|komme|
+|du|kommst|
+|er|kommt|
+|wir|kommen|
+|ihr|kommt|
+|sie|kommen|
+|Sie|kommen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       37239490-ecd5-48a7-bc43-ffb31696738d
+:END:
+|ich|bin gekommen|
+|du|bist gekommen|
+|er|ist gekommen|
+|wir|sind gekommen|
+|ihr|seid gekommen|
+|sie|sind gekommen|
+|Sie|sind gekommen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       f36cd457-5576-4e5b-b683-146ea7c22f67
+:END:
+|ich|kam|
+|du|kamst|
+|er|kam|
+|wir|kamen|
+|ihr|kamt|
+|sie|kamen|
+|Sie|kamen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "gehen"
+:VERB_TRANSLATION: "blow;go;run;walk--to explode"
+:ID:       45d64381-00ce-4250-9d82-65aade68bf15
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       e005f3d1-6c1f-463d-98fb-d94363aeb7b6
+:END:
+|ich|gehe|
+|du|gehst|
+|er|geht|
+|wir|gehen|
+|ihr|geht|
+|sie|gehen|
+|Sie|gehen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       f59d70f3-4409-4c63-81bc-1914d5c69d42
+:END:
+|ich|bin gegangen|
+|du|bist gegangen|
+|er|ist gegangen|
+|wir|sind gegangen|
+|ihr|seid gegangen|
+|sie|sind gegangen|
+|Sie|sind gegangen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       0cdd0d63-8a4f-4cd0-a31f-ff8197e03191
+:END:
+|ich|ging|
+|du|gingst|
+|er|ging|
+|wir|gingen|
+|ihr|gingt|
+|sie|gingen|
+|Sie|gingen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "essen"
+:VERB_TRANSLATION: "eat;eat--consume"
+:ID:       d5ddfeff-1e43-4855-8705-6ea7ecbddc4a
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       d05f5561-770b-4980-bdae-fb5f77ddc82d
+:END:
+|ich|esse|
+|du|isst|
+|er|isst|
+|wir|essen|
+|ihr|esst|
+|sie|essen|
+|Sie|essen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       8c5bad65-e4f2-45dd-8c11-c54dffd5c9a4
+:END:
+|ich|habe gegessen|
+|du|hast gegessen|
+|er|hat gegessen|
+|wir|haben gegessen|
+|ihr|habt gegessen|
+|sie|haben gegessen|
+|Sie|haben gegessen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       6f127049-a996-4022-a9e6-4c6ee8126f55
+:END:
+|ich|aß|
+|du|aßest|
+|er|aß|
+|wir|aßen|
+|ihr|aßt|
+|sie|aßen|
+|Sie|aßen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "trinken"
+:VERB_TRANSLATION: "drink--consume liquid through the mouth"
+:ID:       19e1d53a-31fe-44da-b091-cc1d5baf7952
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       20be89e1-7866-44c7-ae22-f3e0220215c8
+:END:
+|ich|trinke|
+|du|trinkst|
+|er|trinkt|
+|wir|trinken|
+|ihr|trinkt|
+|sie|trinken|
+|Sie|trinken|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       02995a3c-3c1a-4066-9a96-acae5451c9d0
+:END:
+|ich|habe getrunken|
+|du|hast getrunken|
+|er|hat getrunken|
+|wir|haben getrunken|
+|ihr|habt getrunken|
+|sie|haben getrunken|
+|Sie|haben getrunken|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       f5cb2a6b-62b4-4a65-b332-97f445d82f98
+:END:
+|ich|trank|
+|du|trankst|
+|er|trank|
+|wir|tranken|
+|ihr|trankt|
+|sie|tranken|
+|Sie|tranken|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "schmecken"
+:VERB_TRANSLATION: "taste--to have a taste"
+:ID:       77ea0150-7637-48e3-a253-93a03d6a68e3
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       ff9fe7cb-8731-46ca-a72b-7427870156a9
+:END:
+|ich|schmecke|
+|du|schmeckst|
+|er|schmeckt|
+|wir|schmecken|
+|ihr|schmeckt|
+|sie|schmecken|
+|Sie|schmecken|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       91479608-4cbb-49a3-9aa8-da0759c8ce3f
+:END:
+|ich|habe geschmeckt|
+|du|hast geschmeckt|
+|er|hat geschmeckt|
+|wir|haben geschmeckt|
+|ihr|habt geschmeckt|
+|sie|haben geschmeckt|
+|Sie|haben geschmeckt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       6e060fa7-46a6-43e6-bcc1-c2dc40c1c6ef
+:END:
+|ich|schmeckte|
+|du|schmecktest|
+|er|schmeckte|
+|wir|schmeckten|
+|ihr|schmecktet|
+|sie|schmeckten|
+|Sie|schmeckten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "träumen"
+:VERB_TRANSLATION: "dream;dream;dream;daydream--see imaginary events while sleeping"
+:ID:       804da3bc-6c86-466a-b779-4cebd5fdb3d3
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       b30dac1b-d746-4ad9-90c8-ab5ee6ef36ce
+:END:
+|ich|träume|
+|du|träumst|
+|er|träumt|
+|wir|träumen|
+|ihr|träumt|
+|sie|träumen|
+|Sie|träumen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       f6dc39cc-9ccf-41ed-a03e-1da1344e56ca
+:END:
+|ich|habe geträumt|
+|du|hast geträumt|
+|er|hat geträumt|
+|wir|haben geträumt|
+|ihr|habt geträumt|
+|sie|haben geträumt|
+|Sie|haben geträumt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       3d777d6e-71b0-4f4d-a8d9-ac54e9abc65f
+:END:
+|ich|träumte|
+|du|träumtest|
+|er|träumte|
+|wir|träumten|
+|ihr|träumtet|
+|sie|träumten|
+|Sie|träumten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "singen"
+:VERB_TRANSLATION: "sing--to produce harmonious sounds with one’s voice"
+:ID:       44ea7d86-2ebd-4b35-8f0e-9201fefd16b9
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       286d8d65-7962-46e5-bbae-ace5337c6f6a
+:END:
+|ich|singe|
+|du|singst|
+|er|singt|
+|wir|singen|
+|ihr|singt|
+|sie|singen|
+|Sie|singen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       01987b9f-0792-42ed-9c2c-6b829cc4396b
+:END:
+|ich|habe gesungen|
+|du|hast gesungen|
+|er|hat gesungen|
+|wir|haben gesungen|
+|ihr|habt gesungen|
+|sie|haben gesungen|
+|Sie|haben gesungen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       d55b26b6-f782-4317-8f2b-12d244aaf1f1
+:END:
+|ich|sang|
+|du|sangst|
+|er|sang|
+|wir|sangen|
+|ihr|sangt|
+|sie|sangen|
+|Sie|sangen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "akzeptieren"
+:VERB_TRANSLATION: "accept;agree;allow--to agree to"
+:ID:       ef5aaa86-c99e-4040-a2f0-67ff7420f634
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       1b04a797-5b2d-429f-adeb-72bdb4b86a0d
+:END:
+|ich|akzeptiere|
+|du|akzeptierst|
+|er|akzeptiert|
+|wir|akzeptieren|
+|ihr|akzeptiert|
+|sie|akzeptieren|
+|Sie|akzeptieren|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       a1a96cc5-a9a5-476a-a0e7-5452699af12b
+:END:
+|ich|habe akzeptiert|
+|du|hast akzeptiert|
+|er|hat akzeptiert|
+|wir|haben akzeptiert|
+|ihr|habt akzeptiert|
+|sie|haben akzeptiert|
+|Sie|haben akzeptiert|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       563042fa-ab8b-47ac-9c8e-26533ea30818
+:END:
+|ich|akzeptierte|
+|du|akzeptiertest|
+|er|akzeptierte|
+|wir|akzeptierten|
+|ihr|akzeptiertet|
+|sie|akzeptierten|
+|Sie|akzeptierten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "erweitern"
+:VERB_TRANSLATION: "extend;extend;widen;widen--to increase in extent"
+:ID:       0d84263d-9b72-4832-9a6d-c390c5f9485a
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       022e8e94-b5f3-4742-8f49-10e8746ebdc4
+:END:
+|ich|erweitere,erweitre|
+|du|erweiterst|
+|er|erweitert|
+|wir|erweitern|
+|ihr|erweitert|
+|sie|erweitern|
+|Sie|erweitern|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       6c3cfedb-78d3-424a-9a84-5e606875fb7d
+:END:
+|ich|habe erweitert|
+|du|hast erweitert|
+|er|hat erweitert|
+|wir|haben erweitert|
+|ihr|habt erweitert|
+|sie|haben erweitert|
+|Sie|haben erweitert|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       f914dd51-a56e-4169-ae44-43e03f2ff932
+:END:
+|ich|erweiterte|
+|du|erweitertest|
+|er|erweiterte|
+|wir|erweiterten|
+|ihr|erweitertet|
+|sie|erweiterten|
+|Sie|erweiterten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "steigen"
+:VERB_TRANSLATION: "rise;climb;climb;ascend--To move upwards"
+:ID:       1e410e8f-2613-41f9-bfc6-ae18534414ab
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       75ed9b99-b554-41ca-8fbb-9b371b373b5d
+:END:
+|ich|steige|
+|du|steigst|
+|er|steigt|
+|wir|steigen|
+|ihr|steigt|
+|sie|steigen|
+|Sie|steigen|
+*** 	 :drill:
+    SCHEDULED: <2016-04-19 Tue>
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       3c65fe0b-b2ff-4a52-80c7-90817959dab9
+:DRILL_LAST_INTERVAL: 3.0207
+:DRILL_REPEATS_SINCE_FAIL: 2
+:DRILL_TOTAL_REPEATS: 2
+:DRILL_FAILURE_COUNT: 1
+:DRILL_AVERAGE_QUALITY: 2.0
+:DRILL_EASE: 2.36
+:DRILL_LAST_QUALITY: 3
+:DRILL_LAST_REVIEWED: [2016-04-16 Sat 18:51]
+:END:
+|ich|bin gestiegen|
+|du|bist gestiegen|
+|er|ist gestiegen|
+|wir|sind gestiegen|
+|ihr|seid gestiegen|
+|sie|sind gestiegen|
+|Sie|sind gestiegen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       624df861-fbbd-4644-a079-4c52c30cac10
+:END:
+|ich|stieg|
+|du|stiegst|
+|er|stieg|
+|wir|stiegen|
+|ihr|stiegt|
+|sie|stiegen|
+|Sie|stiegen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "halten"
+:VERB_TRANSLATION: "deem;hold;keep;adhere;endorse;prop;consider--to evaluate according to one's beliefs"
+:ID:       f91d82d2-e51e-4cb6-a7ba-60aa66622a19
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       938c40da-af3a-4671-a704-25c3f97b77a3
+:END:
+|ich|halte|
+|du|hältst|
+|er|hält|
+|wir|halten|
+|ihr|haltet|
+|sie|halten|
+|Sie|halten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       becd8370-8d85-4b6f-a9be-b7a249865d9c
+:END:
+|ich|habe gehalten|
+|du|hast gehalten|
+|er|hat gehalten|
+|wir|haben gehalten|
+|ihr|habt gehalten|
+|sie|haben gehalten|
+|Sie|haben gehalten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       f2dbf965-6603-43ca-afd5-cea8d825a6d7
+:END:
+|ich|hielt|
+|du|hieltest|
+|er|hielt|
+|wir|hielten|
+|ihr|hieltet|
+|sie|hielten|
+|Sie|hielten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "abonnieren"
+:VERB_TRANSLATION: "subscribe--to sign up to receive a publication"
+:ID:       2c20f7e9-9032-48e5-8df3-c5e207adb5bd
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       d2bb3df7-f3bf-4164-9b29-658df05aebb9
+:END:
+|ich|abonniere|
+|du|abonnierst|
+|er|abonniert|
+|wir|abonnieren|
+|ihr|abonniert|
+|sie|abonnieren|
+|Sie|abonnieren|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       98adc1d3-1a18-4c68-a45a-70cbd167f3be
+:END:
+|ich|habe abonniert|
+|du|hast abonniert|
+|er|hat abonniert|
+|wir|haben abonniert|
+|ihr|habt abonniert|
+|sie|haben abonniert|
+|Sie|haben abonniert|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       1090a8df-20b0-44db-9ae3-63abcb9c44bb
+:END:
+|ich|abonnierte|
+|du|abonniertest|
+|er|abonnierte|
+|wir|abonnierten|
+|ihr|abonniertet|
+|sie|abonnierten|
+|Sie|abonnierten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "bleiben"
+:VERB_TRANSLATION: "remain;remain;remain;linger--to stay behind while others withdraw"
+:ID:       cf9b62e1-382f-4886-8296-d1c8ef7c9e9c
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       311be2f3-7966-454f-afa6-4b9db7a5feec
+:END:
+|ich|bleibe|
+|du|bleibst|
+|er|bleibt|
+|wir|bleiben|
+|ihr|bleibt|
+|sie|bleiben|
+|Sie|bleiben|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       24932106-3da5-4107-80aa-a9129c6be1ed
+:END:
+|ich|bin geblieben|
+|du|bist geblieben|
+|er|ist geblieben|
+|wir|sind geblieben|
+|ihr|seid geblieben|
+|sie|sind geblieben|
+|Sie|sind geblieben|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       28358e99-7d0e-48e3-8d53-993a2db6e995
+:END:
+|ich|blieb|
+|du|bliebst|
+|er|blieb|
+|wir|blieben|
+|ihr|bliebt|
+|sie|blieben|
+|Sie|blieben|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "prüfen"
+:VERB_TRANSLATION: "prove;examine;dip;inspect--to demonstrate that something is true; to give proof for"
+:ID:       4cd32860-eadf-4365-bd3d-10ac6fb72a27
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       ae7fe51c-01ab-4f56-b48e-24906f6ad367
+:END:
+|ich|prüfe|
+|du|prüfst|
+|er|prüft|
+|wir|prüfen|
+|ihr|prüft|
+|sie|prüfen|
+|Sie|prüfen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       50d23b72-ec65-4078-a0aa-dee6efc57d4a
+:END:
+|ich|habe geprüft|
+|du|hast geprüft|
+|er|hat geprüft|
+|wir|haben geprüft|
+|ihr|habt geprüft|
+|sie|haben geprüft|
+|Sie|haben geprüft|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       2ae13302-d395-4e59-b417-8d7953f6c7aa
+:END:
+|ich|prüfte|
+|du|prüftest|
+|er|prüfte|
+|wir|prüften|
+|ihr|prüftet|
+|sie|prüften|
+|Sie|prüften|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "spazieren"
+:VERB_TRANSLATION: "amble--to stroll or walk slowly and leisurely"
+:ID:       f8c39604-97c1-441d-9601-482bb2d1dc59
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       f6019d65-d84e-411f-81ae-babb69995b9a
+:END:
+|ich|spaziere|
+|du|spazierst|
+|er|spaziert|
+|wir|spazieren|
+|ihr|spaziert|
+|sie|spazieren|
+|Sie|spazieren|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       c86d7706-9709-4ba6-9e64-3b8be65c0d82
+:END:
+|ich|habe spaziert|
+|du|hast spaziert|
+|er|hat spaziert|
+|wir|haben spaziert|
+|ihr|habt spaziert|
+|sie|haben spaziert|
+|Sie|haben spaziert|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       828c2d62-c5dd-4506-9fed-f1e196a0a6ce
+:END:
+|ich|spazierte|
+|du|spaziertest|
+|er|spazierte|
+|wir|spazierten|
+|ihr|spaziertet|
+|sie|spazierten|
+|Sie|spazierten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "mögen"
+:VERB_TRANSLATION: "may--have permission to"
+:ID:       47f6cc9b-8e12-49e6-b577-6435fbc6481e
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       80dbe8c9-918f-4350-8a54-370515620822
+:END:
+|ich|mag|
+|du|magst|
+|er|mag|
+|wir|mögen|
+|ihr|mögt|
+|sie|mögen|
+|Sie|mögen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       2e80f355-42e2-48c0-a828-27f1fe8b430f
+:END:
+|ich|habe gemocht|
+|du|hast gemocht|
+|er|hat gemocht|
+|wir|haben gemocht|
+|ihr|habt gemocht|
+|sie|haben gemocht|
+|Sie|haben gemocht|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       cc4f732b-3654-49ac-b500-b752a995f8fe
+:END:
+|ich|mochte|
+|du|mochtest|
+|er|mochte|
+|wir|mochten|
+|ihr|mochtet|
+|sie|mochten|
+|Sie|mochten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "nehmen"
+:VERB_TRANSLATION: "take;take;take;hit;lay;take;bear;convey;take;opt;take;take;take--to grab with the hands"
+:ID:       1c1af64d-0386-4a55-b048-7157c781d160
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       9b332592-0fac-43e7-932b-55f2cc3fe92c
+:END:
+|ich|nehme|
+|du|nimmst|
+|er|nimmt|
+|wir|nehmen|
+|ihr|nehmt|
+|sie|nehmen|
+|Sie|nehmen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       d25da96c-a427-48e4-a355-fd5d31971d5e
+:END:
+|ich|habe genommen|
+|du|hast genommen|
+|er|hat genommen|
+|wir|haben genommen|
+|ihr|habt genommen|
+|sie|haben genommen|
+|Sie|haben genommen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       6fd9ba2d-6e59-47a6-95fd-43828a86833c
+:END:
+|ich|nahm|
+|du|nahmst|
+|er|nahm|
+|wir|nahmen|
+|ihr|nahmt|
+|sie|nahmen|
+|Sie|nahmen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "schließen"
+:VERB_TRANSLATION: "close;close;close;draw;infer;shut;elicit;conclude;conclude--obstruct (an opening)"
+:ID:       a3fa9099-ea83-40d5-b550-b564e2b12feb
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       c7869a81-f88f-4199-bc69-6e906ce08f31
+:END:
+|ich|schließe|
+|du|schließt|
+|er|schließt|
+|wir|schließen|
+|ihr|schließt|
+|sie|schließen|
+|Sie|schließen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       26f62ceb-55f2-488c-ba7f-00f36a1cd02d
+:END:
+|ich|habe geschlossen|
+|du|hast geschlossen|
+|er|hat geschlossen|
+|wir|haben geschlossen|
+|ihr|habt geschlossen|
+|sie|haben geschlossen|
+|Sie|haben geschlossen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       a133abef-05e5-4b93-bb08-7a0ea8c48411
+:END:
+|ich|schloss|
+|du|schlossest|
+|er|schloss|
+|wir|schlossen|
+|ihr|schlosst|
+|sie|schlossen|
+|Sie|schlossen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "bestellen"
+:VERB_TRANSLATION: "order;cultivate--to request some product or service"
+:ID:       960e3099-58f0-4178-954b-db3ff7ff52a8
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       dfff8694-fd7a-42b3-86a5-0f1e914b0d66
+:END:
+|ich|bestelle|
+|du|bestellst|
+|er|bestellt|
+|wir|bestellen|
+|ihr|bestellt|
+|sie|bestellen|
+|Sie|bestellen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       9af860ab-cad1-4bab-ada3-40da47579f0f
+:END:
+|ich|habe bestellt|
+|du|hast bestellt|
+|er|hat bestellt|
+|wir|haben bestellt|
+|ihr|habt bestellt|
+|sie|haben bestellt|
+|Sie|haben bestellt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       8b137f38-856a-41f4-ac4b-27e94cf66b67
+:END:
+|ich|bestellte|
+|du|bestelltest|
+|er|bestellte|
+|wir|bestellten|
+|ihr|bestelltet|
+|sie|bestellten|
+|Sie|bestellten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "meinen"
+:VERB_TRANSLATION: "think;mean;portend;mean--be of the opinion that"
+:ID:       d11e5991-fcbf-4217-afe2-76cc61efd073
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       2dae07f8-8e37-433b-aa43-63f928986bcf
+:END:
+|ich|meine|
+|du|meinst|
+|er|meint|
+|wir|meinen|
+|ihr|meint|
+|sie|meinen|
+|Sie|meinen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       14a572f1-a78e-42eb-8df0-20c143d84232
+:END:
+|ich|habe gemeint|
+|du|hast gemeint|
+|er|hat gemeint|
+|wir|haben gemeint|
+|ihr|habt gemeint|
+|sie|haben gemeint|
+|Sie|haben gemeint|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       d189556d-732e-4406-8d53-cb45e05ef489
+:END:
+|ich|meinte|
+|du|meintest|
+|er|meinte|
+|wir|meinten|
+|ihr|meintet|
+|sie|meinten|
+|Sie|meinten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "übernehmen"
+:VERB_TRANSLATION: "carry;adopt;inherit--to adopt; take over or stand in"
+:ID:       28482621-934e-48df-a043-d356f4e867f8
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       4e98a514-43da-4d8c-b663-3ae7586f1112
+:END:
+|ich|übernehme,nehme über|
+|du|übernimmst,nimmst über|
+|er|übernimmt,nimmt über|
+|wir|übernehmen,nehmen über|
+|ihr|übernehmt,nehmt über|
+|sie|übernehmen,nehmen über|
+|Sie|übernehmen,nehmen über|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       c2b441aa-f85d-452c-a96e-ab302ad8366a
+:END:
+|ich|habe übernommen,übergenommen|
+|du|hast übernommen,übergenommen|
+|er|hat übernommen,übergenommen|
+|wir|haben übernommen,übergenommen|
+|ihr|habt übernommen,übergenommen|
+|sie|haben übernommen,übergenommen|
+|Sie|haben übernommen,übergenommen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       5b3a374a-ea51-478c-84f9-25e75c6489d0
+:END:
+|ich|übernahm,nahm über|
+|du|übernahmst,nahmst über|
+|er|übernahm,nahm über|
+|wir|übernahmen,nahmen über|
+|ihr|übernahmt,nahmt über|
+|sie|übernahmen,nahmen über|
+|Sie|übernahmen,nahmen über|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "suchen"
+:VERB_TRANSLATION: "hunt;look;seek;search;search--to search for something"
+:ID:       0d3af1a1-80e1-4cef-bde8-0efe3ca89752
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       d2635f4c-97a7-42fb-828b-8a822e66aad0
+:END:
+|ich|suche|
+|du|suchst|
+|er|sucht|
+|wir|suchen|
+|ihr|sucht|
+|sie|suchen|
+|Sie|suchen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       52e27262-bec5-41a2-a3f9-57e8e67df28f
+:END:
+|ich|habe gesucht|
+|du|hast gesucht|
+|er|hat gesucht|
+|wir|haben gesucht|
+|ihr|habt gesucht|
+|sie|haben gesucht|
+|Sie|haben gesucht|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       1e51a150-6120-48db-af69-7f1e90f6b556
+:END:
+|ich|suchte|
+|du|suchtest|
+|er|suchte|
+|wir|suchten|
+|ihr|suchtet|
+|sie|suchten|
+|Sie|suchten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "ersetzen"
+:VERB_TRANSLATION: "supersede;substitute;replace;supplant--Take the place of"
+:ID:       97ae3170-24f7-4f3c-a744-06f18951258a
+:END:
+*** 	 :drill:
+    SCHEDULED: <2016-04-19 Tue>
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       af85c5a9-3965-4df7-9697-f192736092c0
+:DRILL_LAST_INTERVAL: 3.1656
+:DRILL_REPEATS_SINCE_FAIL: 2
+:DRILL_TOTAL_REPEATS: 2
+:DRILL_FAILURE_COUNT: 1
+:DRILL_AVERAGE_QUALITY: 2.5
+:DRILL_EASE: 2.36
+:DRILL_LAST_QUALITY: 3
+:DRILL_LAST_REVIEWED: [2016-04-16 Sat 18:50]
+:END:
+|ich|ersetze|
+|du|ersetzt|
+|er|ersetzt|
+|wir|ersetzen|
+|ihr|ersetzt|
+|sie|ersetzen|
+|Sie|ersetzen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       1c02780f-7e44-4918-9bde-d8a7cec4899d
+:END:
+|ich|habe ersetzt|
+|du|hast ersetzt|
+|er|hat ersetzt|
+|wir|haben ersetzt|
+|ihr|habt ersetzt|
+|sie|haben ersetzt|
+|Sie|haben ersetzt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       d10e0a62-54f3-430b-ab5d-4dd46a1664b5
+:END:
+|ich|ersetzte|
+|du|ersetztest|
+|er|ersetzte|
+|wir|ersetzten|
+|ihr|ersetztet|
+|sie|ersetzten|
+|Sie|ersetzten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "stellen"
+:VERB_TRANSLATION: "stand;face;pop;put;set;set;place;pose;pose;confront--to place in an upright or standing position"
+:ID:       f837cf3d-a02f-45c4-8f21-272c4b16aea2
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       5f8ed5e2-e6c1-4785-81a5-ad6e7f39ee1b
+:END:
+|ich|stelle|
+|du|stellst|
+|er|stellt|
+|wir|stellen|
+|ihr|stellt|
+|sie|stellen|
+|Sie|stellen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       06b84eb0-4f84-4add-ac56-8d92c9fabc31
+:END:
+|ich|habe gestellt|
+|du|hast gestellt|
+|er|hat gestellt|
+|wir|haben gestellt|
+|ihr|habt gestellt|
+|sie|haben gestellt|
+|Sie|haben gestellt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       419adeba-5def-432e-bca8-306aa575053a
+:END:
+|ich|stellte|
+|du|stelltest|
+|er|stellte|
+|wir|stellten|
+|ihr|stelltet|
+|sie|stellten|
+|Sie|stellten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "treffen"
+:VERB_TRANSLATION: "hit;hit;hit;meet;meet;meet;score;encounter--to give a blow"
+:ID:       e9e9dcd7-3623-438c-b2da-a2434fbfb1df
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       f11aa6bd-692b-46dc-9e2f-dfb87b6afd92
+:END:
+|ich|treffe|
+|du|triffst|
+|er|trifft|
+|wir|treffen|
+|ihr|trefft|
+|sie|treffen|
+|Sie|treffen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       58b8c274-3e41-4c00-8205-c632dcc3d848
+:END:
+|ich|habe getroffen|
+|du|hast getroffen|
+|er|hat getroffen|
+|wir|haben getroffen|
+|ihr|habt getroffen|
+|sie|haben getroffen|
+|Sie|haben getroffen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       b6763474-d0dd-4157-866b-de0b5c981e06
+:END:
+|ich|traf|
+|du|trafst|
+|er|traf|
+|wir|trafen|
+|ihr|traft|
+|sie|trafen|
+|Sie|trafen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "warten"
+:VERB_TRANSLATION: "enforce;maintain;service;wait--to keep up"
+:ID:       2f29fa4e-29f6-4929-9f69-a7299df367c7
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       54e5167a-d95d-4be2-86f9-b1ec7623ee53
+:END:
+|ich|warte|
+|du|wartest|
+|er|wartet|
+|wir|warten|
+|ihr|wartet|
+|sie|warten|
+|Sie|warten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       8ca189b1-cf3f-44fb-be9e-d7031589b396
+:END:
+|ich|habe gewartet|
+|du|hast gewartet|
+|er|hat gewartet|
+|wir|haben gewartet|
+|ihr|habt gewartet|
+|sie|haben gewartet|
+|Sie|haben gewartet|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       91385c36-210a-4356-bfc0-465baedd61ca
+:END:
+|ich|wartete|
+|du|wartetest|
+|er|wartete|
+|wir|warteten|
+|ihr|wartetet|
+|sie|warteten|
+|Sie|warteten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "hoffen"
+:VERB_TRANSLATION: "hope;aspire--to want something to happen, with expectation that it might"
+:ID:       81e7ce3c-e00d-45fa-b1eb-30a4c8a5f9d2
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       9eea7078-b08e-4f19-a6e0-7b8c781fe48c
+:END:
+|ich|hoffe|
+|du|hoffst|
+|er|hofft|
+|wir|hoffen|
+|ihr|hofft|
+|sie|hoffen|
+|Sie|hoffen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       520fad0c-ccba-4659-98b8-2af7b48e1166
+:END:
+|ich|habe gehofft|
+|du|hast gehofft|
+|er|hat gehofft|
+|wir|haben gehofft|
+|ihr|habt gehofft|
+|sie|haben gehofft|
+|Sie|haben gehofft|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       616415ad-8afb-4dba-809d-97f07895314d
+:END:
+|ich|hoffte|
+|du|hofftest|
+|er|hoffte|
+|wir|hofften|
+|ihr|hofftet|
+|sie|hofften|
+|Sie|hofften|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "schwimmen"
+:VERB_TRANSLATION: "swim;float;float--move through water"
+:ID:       d4c3c4ba-b1b8-42cf-a3bb-9ada9279505b
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       99466d29-eea8-4af3-a006-9a8fec6d2692
+:END:
+|ich|schwimme|
+|du|schwimmst|
+|er|schwimmt|
+|wir|schwimmen|
+|ihr|schwimmt|
+|sie|schwimmen|
+|Sie|schwimmen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       d4545569-ec5d-4244-898a-795f095b134c
+:END:
+|ich|bin geschwommen|
+|du|bist geschwommen|
+|er|ist geschwommen|
+|wir|sind geschwommen|
+|ihr|seid geschwommen|
+|sie|sind geschwommen|
+|Sie|sind geschwommen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       8c954457-1f3a-43a5-ae8c-6713135d8e10
+:END:
+|ich|schwamm|
+|du|schwammst|
+|er|schwamm|
+|wir|schwammen|
+|ihr|schwammt|
+|sie|schwammen|
+|Sie|schwammen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "sammeln"
+:VERB_TRANSLATION: "center;gather--concentrate on"
+:ID:       87d84831-77e5-4678-b9bc-d6ff7aa5bb4d
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       c2671ee4-d753-4eff-aaf3-25e07cdbe010
+:END:
+|ich|sammle|
+|du|sammelst|
+|er|sammelt|
+|wir|sammeln|
+|ihr|sammelt|
+|sie|sammeln|
+|Sie|sammeln|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       133dbf7d-d84d-4a6c-9520-9291a0cfe4aa
+:END:
+|ich|habe gesammelt|
+|du|hast gesammelt|
+|er|hat gesammelt|
+|wir|haben gesammelt|
+|ihr|habt gesammelt|
+|sie|haben gesammelt|
+|Sie|haben gesammelt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       58a89e5d-1359-4952-8cd4-ad89f1c4b40a
+:END:
+|ich|sammelte|
+|du|sammeltest|
+|er|sammelte|
+|wir|sammelten|
+|ihr|sammeltet|
+|sie|sammelten|
+|Sie|sammelten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "benutzen"
+:VERB_TRANSLATION: "use;apply--employ, apply"
+:ID:       7e08a222-831c-40bc-812b-607b2bcb0af4
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       ac21c94b-b524-4a66-8dff-9056351c0678
+:END:
+|ich|benutze|
+|du|benutzt|
+|er|benutzt|
+|wir|benutzen|
+|ihr|benutzt|
+|sie|benutzen|
+|Sie|benutzen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       e08ea8ac-29cb-42da-9077-f9f25fbd9f6a
+:END:
+|ich|habe benutzt|
+|du|hast benutzt|
+|er|hat benutzt|
+|wir|haben benutzt|
+|ihr|habt benutzt|
+|sie|haben benutzt|
+|Sie|haben benutzt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       78861986-137a-4a0f-8266-cfb1b4567c73
+:END:
+|ich|benutzte|
+|du|benutztest|
+|er|benutzte|
+|wir|benutzten|
+|ihr|benutztet|
+|sie|benutzten|
+|Sie|benutzten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "funktionieren"
+:VERB_TRANSLATION: "work;function--function correctly"
+:ID:       0d44a2bd-07eb-402a-8735-bcaac6b09dc6
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       70ab344e-35b8-4d90-939f-25a0d62c1e33
+:END:
+|ich|funktioniere|
+|du|funktionierst|
+|er|funktioniert|
+|wir|funktionieren|
+|ihr|funktioniert|
+|sie|funktionieren|
+|Sie|funktionieren|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       25c8b645-e107-4690-b1f9-2d69afd98878
+:END:
+|ich|habe funktioniert|
+|du|hast funktioniert|
+|er|hat funktioniert|
+|wir|haben funktioniert|
+|ihr|habt funktioniert|
+|sie|haben funktioniert|
+|Sie|haben funktioniert|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       2f22fd30-b5bd-4c5a-882e-0e445a55eec8
+:END:
+|ich|funktionierte|
+|du|funktioniertest|
+|er|funktionierte|
+|wir|funktionierten|
+|ihr|funktioniertet|
+|sie|funktionierten|
+|Sie|funktionierten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "finden"
+:VERB_TRANSLATION: "think;find--be of the opinion that"
+:ID:       80b83c40-e8ca-436d-9741-09bc239e9355
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       b075148f-1e67-450c-b730-156a74ee4e43
+:END:
+|ich|finde|
+|du|findest|
+|er|findet|
+|wir|finden|
+|ihr|findet|
+|sie|finden|
+|Sie|finden|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       dab41d55-3ed0-45dd-8b0b-35c9784e9c01
+:END:
+|ich|habe gefunden|
+|du|hast gefunden|
+|er|hat gefunden|
+|wir|haben gefunden|
+|ihr|habt gefunden|
+|sie|haben gefunden|
+|Sie|haben gefunden|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       dfc815a6-1cd7-4e6a-801a-2227bd339157
+:END:
+|ich|fand|
+|du|fandest|
+|er|fand|
+|wir|fanden|
+|ihr|fandet|
+|sie|fanden|
+|Sie|fanden|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "ändern"
+:VERB_TRANSLATION: "change;change;modify--to become something different"
+:ID:       a492d03c-1a4e-46c2-aef8-f0af0820d10a
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       ee6d7345-cd97-4e40-831f-c95e754a1335
+:END:
+|ich|ändere,ändre|
+|du|änderst|
+|er|ändert|
+|wir|ändern|
+|ihr|ändert|
+|sie|ändern|
+|Sie|ändern|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       14f12845-7342-4310-959f-9c5fb7fc8e0f
+:END:
+|ich|habe geändert|
+|du|hast geändert|
+|er|hat geändert|
+|wir|haben geändert|
+|ihr|habt geändert|
+|sie|haben geändert|
+|Sie|haben geändert|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       155c9248-63b6-4903-bf01-ba776e51e397
+:END:
+|ich|änderte|
+|du|ändertest|
+|er|änderte|
+|wir|änderten|
+|ihr|ändertet|
+|sie|änderten|
+|Sie|änderten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "erlauben"
+:VERB_TRANSLATION: "allow;allow;allow;allow;permit--to grant, give, admit, accord, afford, or yield; to let one have"
+:ID:       9719f6ec-ae90-4363-8a48-7bad18669af1
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       bdb674a7-fb02-4309-b8cd-a6d7262efd73
+:END:
+|ich|erlaube|
+|du|erlaubst|
+|er|erlaubt|
+|wir|erlauben|
+|ihr|erlaubt|
+|sie|erlauben|
+|Sie|erlauben|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       7d910193-27ca-4d42-a459-ee26d3733ed0
+:END:
+|ich|habe erlaubt|
+|du|hast erlaubt|
+|er|hat erlaubt|
+|wir|haben erlaubt|
+|ihr|habt erlaubt|
+|sie|haben erlaubt|
+|Sie|haben erlaubt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       6c1a748d-498d-4fb7-aee8-69dc88558bc9
+:END:
+|ich|erlaubte|
+|du|erlaubtest|
+|er|erlaubte|
+|wir|erlaubten|
+|ihr|erlaubtet|
+|sie|erlaubten|
+|Sie|erlaubten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "stehen"
+:VERB_TRANSLATION: "stand;stand;become--to support oneself on the feet in an erect position"
+:ID:       4338277a-b739-44fc-ac9d-845750e75e7a
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       64870a25-aab7-4fc6-8366-56a220e70e34
+:END:
+|ich|stehe|
+|du|stehst|
+|er|steht|
+|wir|stehen|
+|ihr|steht|
+|sie|stehen|
+|Sie|stehen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       49724e03-9d13-4aaa-be6b-5f5a80adf5ad
+:END:
+|ich|habe gestanden|
+|du|hast gestanden|
+|er|hat gestanden|
+|wir|haben gestanden|
+|ihr|habt gestanden|
+|sie|haben gestanden|
+|Sie|haben gestanden|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       a86c0dfa-7bda-4739-9903-05435cff1718
+:END:
+|ich|stand|
+|du|stand(e)st|
+|er|stand|
+|wir|standen|
+|ihr|standet|
+|sie|standen|
+|Sie|standen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "wissen"
+:VERB_TRANSLATION: "know;know;know--be certain or sure about (something)"
+:ID:       5dc55565-3bc5-48c9-86f8-70dc80bd361e
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       c62dd006-e30c-4163-a323-220cad56111b
+:END:
+|ich|weiß|
+|du|weißt|
+|er|weiß|
+|wir|wissen|
+|ihr|wisst|
+|sie|wissen|
+|Sie|wissen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       76642d8c-d7c2-42a8-a9a6-995f168259d6
+:END:
+|ich|habe gewusst|
+|du|hast gewusst|
+|er|hat gewusst|
+|wir|haben gewusst|
+|ihr|habt gewusst|
+|sie|haben gewusst|
+|Sie|haben gewusst|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       44e4c0dd-d33d-4726-b2e8-bd38bca07890
+:END:
+|ich|wusste|
+|du|wusstest|
+|er|wusste|
+|wir|wussten|
+|ihr|wusstet|
+|sie|wussten|
+|Sie|wussten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "arbeiten"
+:VERB_TRANSLATION: "work;labour;function--to do a specific task"
+:ID:       6fbdb83b-e053-474c-b7ba-11bb8bbd0354
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       4ccb31ed-7caa-4c1f-93f7-b615676e8ed5
+:END:
+|ich|arbeite|
+|du|arbeitest|
+|er|arbeitet|
+|wir|arbeiten|
+|ihr|arbeitet|
+|sie|arbeiten|
+|Sie|arbeiten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       a5026d64-fc03-4461-ab1b-00e357f74498
+:END:
+|ich|habe gearbeitet|
+|du|hast gearbeitet|
+|er|hat gearbeitet|
+|wir|haben gearbeitet|
+|ihr|habt gearbeitet|
+|sie|haben gearbeitet|
+|Sie|haben gearbeitet|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       753e4acf-01c8-43bf-a376-7c98fb39d4ae
+:END:
+|ich|arbeitete|
+|du|arbeitetest|
+|er|arbeitete|
+|wir|arbeiteten|
+|ihr|arbeitetet|
+|sie|arbeiteten|
+|Sie|arbeiteten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "passieren"
+:VERB_TRANSLATION: "pass;happen;slip;thread;filter;occur;proceed;occur--happen"
+:ID:       8b2882b2-27d3-4eb3-b53d-2c28b7cf362e
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       b7287e8f-b4a8-43ac-9e57-52a9461b355e
+:END:
+|ich|passiere|
+|du|passierst|
+|er|passiert|
+|wir|passieren|
+|ihr|passiert|
+|sie|passieren|
+|Sie|passieren|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       3c79c362-0f50-4662-9411-4efd51353d1b
+:END:
+|ich|habe passiert|
+|du|hast passiert|
+|er|hat passiert|
+|wir|haben passiert|
+|ihr|habt passiert|
+|sie|haben passiert|
+|Sie|haben passiert|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       41db2d60-5d9b-4483-8fca-62cfe6747bd8
+:END:
+|ich|passierte|
+|du|passiertest|
+|er|passierte|
+|wir|passierten|
+|ihr|passiertet|
+|sie|passierten|
+|Sie|passierten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "folgen"
+:VERB_TRANSLATION: "trail;comprehend;follow;grasp;perceive;follow;follow;follow;follow;pursue;ensue--follow behind"
+:ID:       a1518cf2-dc4c-4de4-98cd-1a14b1bf4b71
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       249c2b7e-10eb-4eae-b8e2-37dd375e6055
+:END:
+|ich|folge|
+|du|folgst|
+|er|folgt|
+|wir|folgen|
+|ihr|folgt|
+|sie|folgen|
+|Sie|folgen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       4ae10657-517f-48f0-bf6b-b302fec3cad7
+:END:
+|ich|bin gefolgt|
+|du|bist gefolgt|
+|er|ist gefolgt|
+|wir|sind gefolgt|
+|ihr|seid gefolgt|
+|sie|sind gefolgt|
+|Sie|sind gefolgt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       dc73f16a-29d6-426f-904c-31331541f1dc
+:END:
+|ich|folgte|
+|du|folgtest|
+|er|folgte|
+|wir|folgten|
+|ihr|folgtet|
+|sie|folgten|
+|Sie|folgten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "reichen"
+:VERB_TRANSLATION: "hand;do;slip;thread;reach;reach--to give, pass or transmit with the hand"
+:ID:       ac9a5784-2f08-4d50-af6e-ebd34fad020d
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       e7e6bf7e-2ab7-4359-84e4-eee80a73d43f
+:END:
+|ich|reiche|
+|du|reichst|
+|er|reicht|
+|wir|reichen|
+|ihr|reicht|
+|sie|reichen|
+|Sie|reichen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       347a069d-ca79-4680-afee-b8cf3edee9ce
+:END:
+|ich|habe gereicht|
+|du|hast gereicht|
+|er|hat gereicht|
+|wir|haben gereicht|
+|ihr|habt gereicht|
+|sie|haben gereicht|
+|Sie|haben gereicht|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       7f183570-fa85-4e3f-a1f1-e711d1644369
+:END:
+|ich|reichte|
+|du|reichtest|
+|er|reichte|
+|wir|reichten|
+|ihr|reichtet|
+|sie|reichten|
+|Sie|reichten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "laufen"
+:VERB_TRANSLATION: "run;walk;walk;roll--to move quickly on two feet"
+:ID:       48a51466-d663-40ec-95de-649ce13e3712
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       d4690531-d9a6-49d7-8a5e-f8b7246bbf9b
+:END:
+|ich|laufe|
+|du|läufst|
+|er|läuft|
+|wir|laufen|
+|ihr|lauft|
+|sie|laufen|
+|Sie|laufen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       0c41fc0c-356e-47f6-a572-7d76c1b008d6
+:END:
+|ich|bin gelaufen|
+|du|bist gelaufen|
+|er|ist gelaufen|
+|wir|sind gelaufen|
+|ihr|seid gelaufen|
+|sie|sind gelaufen|
+|Sie|sind gelaufen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       82f348be-3f7c-4096-a6d7-fa6ca9ba16a3
+:END:
+|ich|lief|
+|du|liefst|
+|er|lief|
+|wir|liefen|
+|ihr|lieft|
+|sie|liefen|
+|Sie|liefen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "brauchen"
+:VERB_TRANSLATION: "require--to need"
+:ID:       74f8b09e-1527-411c-86a4-5d0933cdb421
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       452f6187-4b39-4e42-87c9-27df83c6dd58
+:END:
+|ich|brauche|
+|du|brauchst|
+|er|braucht|
+|wir|brauchen|
+|ihr|braucht|
+|sie|brauchen|
+|Sie|brauchen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       1615f9fc-3684-4fcc-a94b-f5f032195e02
+:END:
+|ich|habe gebraucht|
+|du|hast gebraucht|
+|er|hat gebraucht|
+|wir|haben gebraucht|
+|ihr|habt gebraucht|
+|sie|haben gebraucht|
+|Sie|haben gebraucht|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       d7b60daa-b6f4-46ed-a4c1-515a1d1e70a9
+:END:
+|ich|brauchte|
+|du|brauchtest|
+|er|brauchte|
+|wir|brauchten|
+|ihr|brauchtet|
+|sie|brauchten|
+|Sie|brauchten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "helfen"
+:VERB_TRANSLATION: "abet;help;help;avail;assist--to support, uphold, or aid"
+:ID:       580a4a07-66c8-4a12-a82a-46fe57931466
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       8ded38db-f336-4d6c-a5f8-12da07fcebd1
+:END:
+|ich|helfe|
+|du|hilfst|
+|er|hilft|
+|wir|helfen|
+|ihr|helft|
+|sie|helfen|
+|Sie|helfen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       6bb2452f-a1ce-4da4-853d-9ff0005bcdba
+:END:
+|ich|habe geholfen|
+|du|hast geholfen|
+|er|hat geholfen|
+|wir|haben geholfen|
+|ihr|habt geholfen|
+|sie|haben geholfen|
+|Sie|haben geholfen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       24374127-2bba-477b-ab97-0fd10da67c25
+:END:
+|ich|half|
+|du|halfst|
+|er|half|
+|wir|halfen|
+|ihr|halft|
+|sie|halfen|
+|Sie|halfen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "hören"
+:VERB_TRANSLATION: "hear;hear;listen;listen;listen;read;hearken--to perceive sounds through the ear"
+:ID:       3d73eab2-a5ce-49d0-85b2-e0f18d9a56d3
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       39e306b6-e279-4d9b-b843-a5353fb21aca
+:END:
+|ich|höre|
+|du|hörst|
+|er|hört|
+|wir|hören|
+|ihr|hört|
+|sie|hören|
+|Sie|hören|
+*** 	 :drill:
+    SCHEDULED: <2016-04-17 Sun>
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       14ae0a38-e9b8-4388-a29a-d1b60045e4dc
+:DRILL_LAST_INTERVAL: 4.0595
+:DRILL_REPEATS_SINCE_FAIL: 2
+:DRILL_TOTAL_REPEATS: 1
+:DRILL_FAILURE_COUNT: 0
+:DRILL_AVERAGE_QUALITY: 5.0
+:DRILL_EASE: 2.6
+:DRILL_LAST_QUALITY: 5
+:DRILL_LAST_REVIEWED: [2016-04-13 Wed 20:42]
+:END:
+|ich|habe gehört|
+|du|hast gehört|
+|er|hat gehört|
+|wir|haben gehört|
+|ihr|habt gehört|
+|sie|haben gehört|
+|Sie|haben gehört|
+*** 	 :drill:
+    SCHEDULED: <2016-04-17 Sun>
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       2a06142e-d296-4e6b-9bb3-192d7a2030a5
+:DRILL_LAST_INTERVAL: 3.568
+:DRILL_REPEATS_SINCE_FAIL: 2
+:DRILL_TOTAL_REPEATS: 1
+:DRILL_FAILURE_COUNT: 0
+:DRILL_AVERAGE_QUALITY: 4.0
+:DRILL_EASE: 2.5
+:DRILL_LAST_QUALITY: 4
+:DRILL_LAST_REVIEWED: [2016-04-13 Wed 20:46]
+:END:
+|ich|hörte|
+|du|hörtest|
+|er|hörte|
+|wir|hörten|
+|ihr|hörtet|
+|sie|hörten|
+|Sie|hörten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "schlafen"
+:VERB_TRANSLATION: "sleep--to rest in state of reduced consciousness"
+:ID:       d5d3d9fb-c269-486c-a378-01c29bcaff7b
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       28bfbf3a-68b4-4191-a51a-0522176edf59
+:END:
+|ich|schlafe|
+|du|schläfst|
+|er|schläft|
+|wir|schlafen|
+|ihr|schlaft|
+|sie|schlafen|
+|Sie|schlafen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       18965a9c-b14b-4793-92bf-809ee73ea929
+:END:
+|ich|habe geschlafen|
+|du|hast geschlafen|
+|er|hat geschlafen|
+|wir|haben geschlafen|
+|ihr|habt geschlafen|
+|sie|haben geschlafen|
+|Sie|haben geschlafen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       48002774-df98-4355-8fdc-c56eb9558820
+:END:
+|ich|schlief|
+|du|schliefst|
+|er|schlief|
+|wir|schliefen|
+|ihr|schlieft|
+|sie|schliefen|
+|Sie|schliefen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "waschen"
+:VERB_TRANSLATION: "launder;launder;wash;bathe;wash;bathe--to wash and iron"
+:ID:       061492d5-b17c-4c87-a177-734a31d4cdac
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       ff53d3ae-ee34-4ab5-be8d-ccfcdd8c51b0
+:END:
+|ich|wasche|
+|du|wäschst|
+|er|wäscht|
+|wir|waschen|
+|ihr|wascht|
+|sie|waschen|
+|Sie|waschen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       28f53b32-0a9f-4fdd-a7b0-a5dfea9da912
+:END:
+|ich|habe gewaschen|
+|du|hast gewaschen|
+|er|hat gewaschen|
+|wir|haben gewaschen|
+|ihr|habt gewaschen|
+|sie|haben gewaschen|
+|Sie|haben gewaschen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       ba4b3301-482d-471d-8fa4-44b3e35bbd9f
+:END:
+|ich|wusch|
+|du|wuschest|
+|er|wusch|
+|wir|wuschen|
+|ihr|wuscht|
+|sie|wuschen|
+|Sie|wuschen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "tragen"
+:VERB_TRANSLATION: "bear;convey;take;bear;bear;wear;carry;sport--to carry"
+:ID:       a8fc2f6d-7db7-4514-88c3-52b94ad357fa
+:END:
+*** 	 :drill:
+    SCHEDULED: <2016-04-18 Mon>
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       8aa7de34-6c29-4f03-93de-8dc522d9272b
+:DRILL_LAST_INTERVAL: 5.2788
+:DRILL_REPEATS_SINCE_FAIL: 2
+:DRILL_TOTAL_REPEATS: 1
+:DRILL_FAILURE_COUNT: 0
+:DRILL_AVERAGE_QUALITY: 5.0
+:DRILL_EASE: 2.6
+:DRILL_LAST_QUALITY: 5
+:DRILL_LAST_REVIEWED: [2016-04-13 Wed 20:41]
+:END:
+|ich|trage|
+|du|trägst|
+|er|trägt|
+|wir|tragen|
+|ihr|tragt|
+|sie|tragen|
+|Sie|tragen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       e2b530f9-03e4-4508-9859-73589ae7bcd1
+:END:
+|ich|habe getragen|
+|du|hast getragen|
+|er|hat getragen|
+|wir|haben getragen|
+|ihr|habt getragen|
+|sie|haben getragen|
+|Sie|haben getragen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       38cefc88-229f-42e0-9757-957ae8125914
+:END:
+|ich|trug|
+|du|trugst|
+|er|trug|
+|wir|trugen|
+|ihr|trugt|
+|sie|trugen|
+|Sie|trugen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "kennen"
+:VERB_TRANSLATION: "know;ken--be acquainted or familiar with"
+:ID:       ec4475ff-25e0-47dd-ae4e-a18b6d2a78bf
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       f5d2c0cd-e884-460e-826d-75838eeb5c1a
+:END:
+|ich|kenne|
+|du|kennst|
+|er|kennt|
+|wir|kennen|
+|ihr|kennt|
+|sie|kennen|
+|Sie|kennen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       795202c3-cd3f-4f1a-a12b-6078e71972aa
+:END:
+|ich|habe gekannt|
+|du|hast gekannt|
+|er|hat gekannt|
+|wir|haben gekannt|
+|ihr|habt gekannt|
+|sie|haben gekannt|
+|Sie|haben gekannt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       4667fa11-59fc-4f45-a729-d16b9385ef72
+:END:
+|ich|kannte|
+|du|kanntest|
+|er|kannte|
+|wir|kannten|
+|ihr|kanntet|
+|sie|kannten|
+|Sie|kannten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "bringen"
+:VERB_TRANSLATION: "bring;make;orbit--to transport toward somebody/somewhere"
+:ID:       897da8eb-843e-4713-9980-e75c080a5c49
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       6c412cf4-3fde-45f7-8738-6db39a8c4710
+:END:
+|ich|bringe|
+|du|bringst|
+|er|bringt|
+|wir|bringen|
+|ihr|bringt|
+|sie|bringen|
+|Sie|bringen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       f23cf5e6-5375-4fcf-8a6e-7d4422c3fe78
+:END:
+|ich|habe gebracht|
+|du|hast gebracht|
+|er|hat gebracht|
+|wir|haben gebracht|
+|ihr|habt gebracht|
+|sie|haben gebracht|
+|Sie|haben gebracht|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       ca7b4cff-0792-438d-b7da-8adf964b7ebc
+:END:
+|ich|brachte|
+|du|brachtest|
+|er|brachte|
+|wir|brachten|
+|ihr|brachtet|
+|sie|brachten|
+|Sie|brachten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "rennen"
+:VERB_TRANSLATION: "run--to move quickly on two feet"
+:ID:       1ed82b87-aaeb-43a0-b340-20501eeddc7d
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       377296cc-d6f0-42c4-bcf6-b1cc1aa0c362
+:END:
+|ich|renne|
+|du|rennst|
+|er|rennt|
+|wir|rennen|
+|ihr|rennt|
+|sie|rennen|
+|Sie|rennen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       98b2f343-8fe2-443d-9ee1-165dbbab7bfb
+:END:
+|ich|bin gerannt|
+|du|bist gerannt|
+|er|ist gerannt|
+|wir|sind gerannt|
+|ihr|seid gerannt|
+|sie|sind gerannt|
+|Sie|sind gerannt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       ca7dccb6-7be4-40a4-b2fc-d352813aa5f7
+:END:
+|ich|rannte|
+|du|ranntest|
+|er|rannte|
+|wir|rannten|
+|ihr|ranntet|
+|sie|rannten|
+|Sie|rannten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "beginnen"
+:VERB_TRANSLATION: "begin;commence;initiate--To start, to initiate or take the first step into something."
+:ID:       5c205d35-82d4-484e-9007-d8c631c5e5aa
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       17804517-c870-46f5-9771-74d1b0e1d12d
+:END:
+|ich|beginne|
+|du|beginnst|
+|er|beginnt|
+|wir|beginnen|
+|ihr|beginnt|
+|sie|beginnen|
+|Sie|beginnen|
+*** 	 :drill:
+    SCHEDULED: <2016-04-20 Wed>
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       ac82f44c-994c-4f85-8d6d-7a8e7121ef0b
+:DRILL_LAST_INTERVAL: 4.2441
+:DRILL_REPEATS_SINCE_FAIL: 2
+:DRILL_TOTAL_REPEATS: 2
+:DRILL_FAILURE_COUNT: 1
+:DRILL_AVERAGE_QUALITY: 2.5
+:DRILL_EASE: 2.36
+:DRILL_LAST_QUALITY: 3
+:DRILL_LAST_REVIEWED: [2016-04-16 Sat 18:52]
+:END:
+|ich|habe begonnen|
+|du|hast begonnen|
+|er|hat begonnen|
+|wir|haben begonnen|
+|ihr|habt begonnen|
+|sie|haben begonnen|
+|Sie|haben begonnen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       35d04cce-2602-4d8f-baac-038641ca78e2
+:END:
+|ich|begann|
+|du|begannst|
+|er|begann|
+|wir|begannen|
+|ihr|begannt|
+|sie|begannen|
+|Sie|begannen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "schreiben"
+:VERB_TRANSLATION: "write;write;write;write;write--to form letters, etc."
+:ID:       917fe85e-d516-423c-a8ce-5358b9206ac7
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       0677c8b2-9d1d-4753-8da9-9446ec75aa06
+:END:
+|ich|schreibe|
+|du|schreibst|
+|er|schreibt|
+|wir|schreiben|
+|ihr|schreibt|
+|sie|schreiben|
+|Sie|schreiben|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       4d197109-22c5-410f-892e-e12851ddfc35
+:END:
+|ich|habe geschrieben|
+|du|hast geschrieben|
+|er|hat geschrieben|
+|wir|haben geschrieben|
+|ihr|habt geschrieben|
+|sie|haben geschrieben|
+|Sie|haben geschrieben|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       0a1c3011-bbac-444a-8c80-3c768fa27959
+:END:
+|ich|schrieb|
+|du|schriebst|
+|er|schrieb|
+|wir|schrieben|
+|ihr|schriebt|
+|sie|schrieben|
+|Sie|schrieben|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "bezahlen"
+:VERB_TRANSLATION: "foot;pay;ransom--pay"
+:ID:       5d51d221-6abd-445f-aaa8-1541fbda78c8
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       cde2b027-84ca-45d3-9606-ba1bbc4cf4e2
+:END:
+|ich|bezahle|
+|du|bezahlst|
+|er|bezahlt|
+|wir|bezahlen|
+|ihr|bezahlt|
+|sie|bezahlen|
+|Sie|bezahlen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       3217e97f-b7e0-4258-a98f-73a979790ad4
+:END:
+|ich|habe bezahlt|
+|du|hast bezahlt|
+|er|hat bezahlt|
+|wir|haben bezahlt|
+|ihr|habt bezahlt|
+|sie|haben bezahlt|
+|Sie|haben bezahlt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       bbdfa144-9ff6-46e0-8827-8c920452ec76
+:END:
+|ich|bezahlte|
+|du|bezahltest|
+|er|bezahlte|
+|wir|bezahlten|
+|ihr|bezahltet|
+|sie|bezahlten|
+|Sie|bezahlten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "lesen"
+:VERB_TRANSLATION: "read--look at and interpret letters or other information"
+:ID:       687058d3-17ad-4bd4-9265-d301f83496c9
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       ec13af07-c039-4954-b25f-628b74fcec41
+:END:
+|ich|lese|
+|du|liest|
+|er|liest|
+|wir|lesen|
+|ihr|lest|
+|sie|lesen|
+|Sie|lesen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       2787da91-ec70-4112-8188-67f449419328
+:END:
+|ich|habe gelesen|
+|du|hast gelesen|
+|er|hat gelesen|
+|wir|haben gelesen|
+|ihr|habt gelesen|
+|sie|haben gelesen|
+|Sie|haben gelesen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       66806aa8-d0bd-48c5-98b8-e4b1621f3823
+:END:
+|ich|las|
+|du|lasest|
+|er|las|
+|wir|lasen|
+|ihr|last|
+|sie|lasen|
+|Sie|lasen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "spielen"
+:VERB_TRANSLATION: "act;act;play;play;play;play;play;play;gamble;gamble;perform;toy;sport;banter;flex--to perform a theatrical role"
+:ID:       7c9633df-c027-4591-b128-98d0d45cd3be
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       d0cd1127-d7db-4237-89de-6e6c71ed6360
+:END:
+|ich|spiele|
+|du|spielst|
+|er|spielt|
+|wir|spielen|
+|ihr|spielt|
+|sie|spielen|
+|Sie|spielen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       c823ea2c-fa58-45f6-897b-c3c103787699
+:END:
+|ich|habe gespielt|
+|du|hast gespielt|
+|er|hat gespielt|
+|wir|haben gespielt|
+|ihr|habt gespielt|
+|sie|haben gespielt|
+|Sie|haben gespielt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       4556d928-9214-4111-ae1a-0d5ff2bf43cd
+:END:
+|ich|spielte|
+|du|spieltest|
+|er|spielte|
+|wir|spielten|
+|ihr|spieltet|
+|sie|spielten|
+|Sie|spielten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "sehen"
+:VERB_TRANSLATION: "see;look;behold;view;watch;sight--perceive with the eyes"
+:ID:       9266e868-ad7f-4c4c-ac46-71cd091e3e27
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       6e196cf4-2f11-4786-b8b4-e7a7330df4f5
+:END:
+|ich|sehe|
+|du|siehst|
+|er|sieht|
+|wir|sehen|
+|ihr|seht|
+|sie|sehen|
+|Sie|sehen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       95ace7a0-89a0-41c3-974b-7ccc23cac831
+:END:
+|ich|habe gesehen|
+|du|hast gesehen|
+|er|hat gesehen|
+|wir|haben gesehen|
+|ihr|habt gesehen|
+|sie|haben gesehen|
+|Sie|haben gesehen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       6666c1f9-05f7-4e17-b0e3-cfbeaa6904fc
+:END:
+|ich|sah|
+|du|sah(e)st|
+|er|sah|
+|wir|sahen|
+|ihr|saht|
+|sie|sahen|
+|Sie|sahen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "werden"
+:VERB_TRANSLATION: "fall;wax;become;get;turn;get;will--become or change into"
+:ID:       a14838ea-5280-422d-a0bb-28777948e45e
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       71b3aa76-6163-48e8-996e-b4b517bb9b63
+:END:
+|ich|werde|
+|du|wirst|
+|er|wird|
+|wir|werden|
+|ihr|werdet|
+|sie|werden|
+|Sie|werden|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       f2149729-e4c4-4064-9bff-5d88cff467d6
+:END:
+|ich|bin geworden|
+|du|bist geworden|
+|er|ist geworden|
+|wir|sind geworden|
+|ihr|seid geworden|
+|sie|sind geworden|
+|Sie|sind geworden|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       e1d0aaee-6baf-4205-b67d-5c71e5036ac0
+:DRILL_LAST_INTERVAL: 0.0
+:DRILL_REPEATS_SINCE_FAIL: 1
+:DRILL_TOTAL_REPEATS: 1
+:DRILL_FAILURE_COUNT: 1
+:DRILL_AVERAGE_QUALITY: 2.0
+:DRILL_EASE: 2.5
+:DRILL_LAST_QUALITY: 2
+:DRILL_LAST_REVIEWED: [2016-04-16 Sat 18:53]
+:END:
+|ich|wurde|
+|du|wurdest|
+|er|wurde|
+|wir|wurden|
+|ihr|wurdet|
+|sie|wurden|
+|Sie|wurden|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "lassen"
+:VERB_TRANSLATION: ";let;suffer;leave;flex--cause to be"
+:ID:       45b3d588-478a-4c62-8b54-5ddf2953989f
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       3a8d8f6b-736a-4d1c-a8bd-cd21602e57b1
+:END:
+|ich|lasse|
+|du|lässt|
+|er|lässt|
+|wir|lassen|
+|ihr|lasst|
+|sie|lassen|
+|Sie|lassen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       5c5ecb93-05b4-4d96-9bd7-ffa744766372
+:END:
+|ich|habe gelassen|
+|du|hast gelassen|
+|er|hat gelassen|
+|wir|haben gelassen|
+|ihr|habt gelassen|
+|sie|haben gelassen|
+|Sie|haben gelassen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       240495d8-4f36-4d82-80bb-973028202e80
+:END:
+|ich|ließ|
+|du|ließest|
+|er|ließ|
+|wir|ließen|
+|ihr|ließt|
+|sie|ließen|
+|Sie|ließen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "tun"
+:VERB_TRANSLATION: "do;do;pop;put;act;perform--perform, execute"
+:ID:       186b8276-cb28-4d07-9652-8bd9445ad131
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       d050aeb5-bb3e-4076-afc4-f2f6bb9a2c88
+:END:
+|ich|tue|
+|du|tust|
+|er|tut|
+|wir|tun|
+|ihr|tut|
+|sie|tun|
+|Sie|tun|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       66ae1786-363f-408b-83ef-747f26d287d5
+:END:
+|ich|habe getan|
+|du|hast getan|
+|er|hat getan|
+|wir|haben getan|
+|ihr|habt getan|
+|sie|haben getan|
+|Sie|haben getan|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       5676ec51-81f4-4e58-99fb-1bacb1b01d9e
+:END:
+|ich|tat|
+|du|tatest|
+|er|tat|
+|wir|taten|
+|ihr|tatet|
+|sie|taten|
+|Sie|taten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "gelten"
+:VERB_TRANSLATION: "hold--to be or remain valid"
+:ID:       4a5d67f8-0234-4cab-aa55-bd4c53261008
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       cc657d52-3f3d-479c-824b-49047afb6da2
+:END:
+|ich|gelte|
+|du|giltst|
+|er|gilt|
+|wir|gelten|
+|ihr|geltet|
+|sie|gelten|
+|Sie|gelten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       9dceb77a-b734-4822-b025-d00e92d3d854
+:END:
+|ich|habe gegolten|
+|du|hast gegolten|
+|er|hat gegolten|
+|wir|haben gegolten|
+|ihr|habt gegolten|
+|sie|haben gegolten|
+|Sie|haben gegolten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       ff74945e-d3a0-48e8-9ba8-e6e742ca92e0
+:END:
+|ich|galt|
+|du|galt(e)st|
+|er|galt|
+|wir|galten|
+|ihr|galtet|
+|sie|galten|
+|Sie|galten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "zeigen"
+:VERB_TRANSLATION: "point;show;show;evince;bespeak;exhibit;exhibit--to extend finger"
+:ID:       570ed895-bcb5-46fe-9c61-c1af889d5df7
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       d2b0f551-e7f0-4ed1-bee4-23fa4e6b2efa
+:END:
+|ich|zeige|
+|du|zeigst|
+|er|zeigt|
+|wir|zeigen|
+|ihr|zeigt|
+|sie|zeigen|
+|Sie|zeigen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       6f47d585-0e8a-448a-a5aa-f7245c6cd6f6
+:END:
+|ich|habe gezeigt|
+|du|hast gezeigt|
+|er|hat gezeigt|
+|wir|haben gezeigt|
+|ihr|habt gezeigt|
+|sie|haben gezeigt|
+|Sie|haben gezeigt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       f7a1a14e-e419-4e58-8972-28f35aadfe4b
+:END:
+|ich|zeigte|
+|du|zeigtest|
+|er|zeigte|
+|wir|zeigten|
+|ihr|zeigtet|
+|sie|zeigten|
+|Sie|zeigten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "bestehen"
+:VERB_TRANSLATION: "stand;obtain;demand;exist;insist--to undergo; withstand; hold up"
+:ID:       f2cc80e1-ade1-482f-b2c9-69cdc15ab95e
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       05b90cfc-46e1-482a-ba38-e8529f8b6546
+:END:
+|ich|bestehe|
+|du|bestehst|
+|er|besteht|
+|wir|bestehen|
+|ihr|besteht|
+|sie|bestehen|
+|Sie|bestehen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       f008db63-509a-4ff5-8021-7960c90974f4
+:END:
+|ich|habe bestanden|
+|du|hast bestanden|
+|er|hat bestanden|
+|wir|haben bestanden|
+|ihr|habt bestanden|
+|sie|haben bestanden|
+|Sie|haben bestanden|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       931498d9-8ffb-44a4-9a8f-5dceb856d362
+:END:
+|ich|bestand|
+|du|bestand(e)st|
+|er|bestand|
+|wir|bestanden|
+|ihr|bestandet|
+|sie|bestanden|
+|Sie|bestanden|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "verstehen"
+:VERB_TRANSLATION: "grok;see;read;catch;understand;understand;fathom;comprehend;follow;grasp;perceive;appreciate;savvy;conceive--to fully understand"
+:ID:       41882c94-d0e3-409b-8c79-074c676b233d
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       2afd3d6d-711f-4451-9a0b-92da9713afa5
+:END:
+|ich|verstehe|
+|du|verstehst|
+|er|versteht|
+|wir|verstehen|
+|ihr|versteht|
+|sie|verstehen|
+|Sie|verstehen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       375c3400-2067-4b49-aadb-5183adac202d
+:END:
+|ich|habe verstanden|
+|du|hast verstanden|
+|er|hat verstanden|
+|wir|haben verstanden|
+|ihr|habt verstanden|
+|sie|haben verstanden|
+|Sie|haben verstanden|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       9406001c-4d2a-421f-8e50-eb69bde0dedf
+:END:
+|ich|verstand|
+|du|verstand(e)st|
+|er|verstand|
+|wir|verstanden|
+|ihr|verstandet|
+|sie|verstanden|
+|Sie|verstanden|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "erzählen"
+:VERB_TRANSLATION: "tell;narrate;rehearse--to pass information"
+:ID:       43ca3299-026f-4f38-8f57-a1e1d87f3abb
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       d0dc9572-f268-415b-89a6-a1653da2f126
+:END:
+|ich|erzähle|
+|du|erzählst|
+|er|erzählt|
+|wir|erzählen|
+|ihr|erzählt|
+|sie|erzählen|
+|Sie|erzählen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       c19cb2e9-732f-421c-9b6d-45b8e4eae6b2
+:END:
+|ich|habe erzählt|
+|du|hast erzählt|
+|er|hat erzählt|
+|wir|haben erzählt|
+|ihr|habt erzählt|
+|sie|haben erzählt|
+|Sie|haben erzählt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       a2185de4-873c-4d98-9d85-ddf4f2366947
+:END:
+|ich|erzählte|
+|du|erzähltest|
+|er|erzählte|
+|wir|erzählten|
+|ihr|erzähltet|
+|sie|erzählten|
+|Sie|erzählten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "versuchen"
+:VERB_TRANSLATION: "attempt;essay;try;try;assay--to try"
+:ID:       ca049276-8350-40aa-b0e4-d6c98dbbfb20
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       de629cc4-ec0b-4960-9511-162e6525b33b
+:END:
+|ich|versuche|
+|du|versuchst|
+|er|versucht|
+|wir|versuchen|
+|ihr|versucht|
+|sie|versuchen|
+|Sie|versuchen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       eeb524d7-f809-4dce-95fd-e8e704785c69
+:END:
+|ich|habe versucht|
+|du|hast versucht|
+|er|hat versucht|
+|wir|haben versucht|
+|ihr|habt versucht|
+|sie|haben versucht|
+|Sie|haben versucht|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       e48efab5-9483-46cc-b7e0-d04f8ee4362f
+:END:
+|ich|versuchte|
+|du|versuchtest|
+|er|versuchte|
+|wir|versuchten|
+|ihr|versuchtet|
+|sie|versuchten|
+|Sie|versuchten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "erklären"
+:VERB_TRANSLATION: "state;elucidate;explain;explain;proclaim;declare;declare;reprobate;rescind--declare to be a fact"
+:ID:       5b97f6bc-63a3-4283-8d64-872e97f7a1b1
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       279d48ef-da82-4d7a-84c3-b68a79793296
+:END:
+|ich|erkläre|
+|du|erklärst|
+|er|erklärt|
+|wir|erklären|
+|ihr|erklärt|
+|sie|erklären|
+|Sie|erklären|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       c4658c09-2760-420c-b15b-8c4bc463c659
+:END:
+|ich|habe erklärt|
+|du|hast erklärt|
+|er|hat erklärt|
+|wir|haben erklärt|
+|ihr|habt erklärt|
+|sie|haben erklärt|
+|Sie|haben erklärt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       bf77bb08-9d1b-47fb-bbe7-d8165553673c
+:END:
+|ich|erklärte|
+|du|erklärtest|
+|er|erklärte|
+|wir|erklärten|
+|ihr|erklärtet|
+|sie|erklärten|
+|Sie|erklärten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "entsprechen"
+:VERB_TRANSLATION: "meet;correspond--comply with"
+:ID:       2b4d3414-c81e-4f97-976c-983c2b5b3ce9
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       15542339-9561-4333-a4b4-a8e67a2f8e67
+:END:
+|ich|entspreche|
+|du|entsprichst|
+|er|entspricht|
+|wir|entsprechen|
+|ihr|entsprecht|
+|sie|entsprechen|
+|Sie|entsprechen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       143509d7-2727-474b-b0f3-47d473a148b8
+:END:
+|ich|habe entsprochen|
+|du|hast entsprochen|
+|er|hat entsprochen|
+|wir|haben entsprochen|
+|ihr|habt entsprochen|
+|sie|haben entsprochen|
+|Sie|haben entsprochen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       2580f281-9b16-426e-8c4a-ff2a28cc5f84
+:END:
+|ich|entsprach|
+|du|entsprachst|
+|er|entsprach|
+|wir|entsprachen|
+|ihr|entspracht|
+|sie|entsprachen|
+|Sie|entsprachen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "sitzen"
+:VERB_TRANSLATION: "sit;sit--of a person, be in a position in which the upper body is upright and the legs are supported"
+:ID:       d50ed86a-3e5d-47d8-96c8-6787d8a8ed61
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       ba7b1a69-4294-4dca-a462-ffeff6b1d563
+:END:
+|ich|sitze|
+|du|sitzt|
+|er|sitzt|
+|wir|sitzen|
+|ihr|sitzt|
+|sie|sitzen|
+|Sie|sitzen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       9ea4bc3c-ddd9-4726-b804-c2539f3c8ffd
+:END:
+|ich|habe gesessen|
+|du|hast gesessen|
+|er|hat gesessen|
+|wir|haben gesessen|
+|ihr|habt gesessen|
+|sie|haben gesessen|
+|Sie|haben gesessen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       ee67d3df-29b4-452d-a19a-3a01feee2f8c
+:END:
+|ich|saß|
+|du|saßest|
+|er|saß|
+|wir|saßen|
+|ihr|saßet|
+|sie|saßen|
+|Sie|saßen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "ziehen"
+:VERB_TRANSLATION: "head;draw;draw;draw;draw;corrode;draw;draw;draw;trail;go;grow;pull;pull;drag;drag;haul--(intransitive) move in a specified direction"
+:ID:       e70eee13-a060-424b-b22c-3ca1a83dee00
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       d3c10ac0-b442-4f63-b8b9-283f0fb1444e
+:END:
+|ich|ziehe|
+|du|ziehst|
+|er|zieht|
+|wir|ziehen|
+|ihr|zieht|
+|sie|ziehen|
+|Sie|ziehen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       4977b99d-df91-4d18-862c-b651b876ce51
+:END:
+|ich|habe gezogen|
+|du|hast gezogen|
+|er|hat gezogen|
+|wir|haben gezogen|
+|ihr|habt gezogen|
+|sie|haben gezogen|
+|Sie|haben gezogen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       93f9d9ce-ccfa-4f16-b7c8-30106ba8c445
+:END:
+|ich|zog|
+|du|zogst|
+|er|zog|
+|wir|zogen|
+|ihr|zogt|
+|sie|zogen|
+|Sie|zogen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "gehören"
+:VERB_TRANSLATION: "pertain--to belong"
+:ID:       ae5d7030-809d-4deb-adcb-d880c94daa64
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       9af2fff3-83a5-4959-affc-72c2a2e88331
+:END:
+|ich|gehöre|
+|du|gehörst|
+|er|gehört|
+|wir|gehören|
+|ihr|gehört|
+|sie|gehören|
+|Sie|gehören|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       d2eb3c82-7bb7-40a6-9e56-b706e70644db
+:END:
+|ich|habe gehört|
+|du|hast gehört|
+|er|hat gehört|
+|wir|haben gehört|
+|ihr|habt gehört|
+|sie|haben gehört|
+|Sie|haben gehört|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       f7a255a9-7765-4290-aaf6-31d52d0bcafd
+:END:
+|ich|gehörte|
+|du|gehörtest|
+|er|gehörte|
+|wir|gehörten|
+|ihr|gehörtet|
+|sie|gehörten|
+|Sie|gehörten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "entstehen"
+:VERB_TRANSLATION: "arise;originate;emerge--start to exist, originate"
+:ID:       9fb8e8bd-23a5-4666-965f-4bf614ad2e81
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       84d2666c-5708-42da-a17f-62d977d9f33c
+:END:
+|ich|entstehe|
+|du|entstehst|
+|er|entsteht|
+|wir|entstehen|
+|ihr|entsteht|
+|sie|entstehen|
+|Sie|entstehen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       faa290d6-5e75-4e71-8dd0-7a16c1e1b4c7
+:END:
+|ich|bin entstanden|
+|du|bist entstanden|
+|er|ist entstanden|
+|wir|sind entstanden|
+|ihr|seid entstanden|
+|sie|sind entstanden|
+|Sie|sind entstanden|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       dd26b185-a6be-4efc-a3a5-56b34394ba10
+:END:
+|ich|entstand|
+|du|entstand(e)st|
+|er|entstand|
+|wir|entstanden|
+|ihr|entstandet|
+|sie|entstanden|
+|Sie|entstanden|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "erhalten"
+:VERB_TRANSLATION: "keep;brood;conserve;preserve;refuge;receive--to maintain the condition of; to preserve"
+:ID:       321e9515-fc00-4e25-a0af-f2c858f08f71
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       6327dcaa-449c-4527-9e29-cdbd737bd4de
+:END:
+|ich|erhalte|
+|du|erhältst|
+|er|erhält|
+|wir|erhalten|
+|ihr|erhaltet|
+|sie|erhalten|
+|Sie|erhalten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       fe209eae-be9a-40a9-bb91-c9007efc9252
+:END:
+|ich|habe erhalten|
+|du|hast erhalten|
+|er|hat erhalten|
+|wir|haben erhalten|
+|ihr|habt erhalten|
+|sie|haben erhalten|
+|Sie|haben erhalten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       4aedf2f8-67e1-4429-b88f-183099b34755
+:END:
+|ich|erhielt|
+|du|erhieltest|
+|er|erhielt|
+|wir|erhielten|
+|ihr|erhieltet|
+|sie|erhielten|
+|Sie|erhielten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "legen"
+:VERB_TRANSLATION: "abate;lay;lay;lay;pop;put;set;pose--to decrease or make less in strength"
+:ID:       2af051e5-9ce6-42ce-981b-14609406c83b
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       5a625fb9-d032-4690-8571-064bc446925f
+:END:
+|ich|lege|
+|du|legst|
+|er|legt|
+|wir|legen|
+|ihr|legt|
+|sie|legen|
+|Sie|legen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       76953c08-3747-4f54-8130-c0093f02e98e
+:END:
+|ich|habe gelegt|
+|du|hast gelegt|
+|er|hat gelegt|
+|wir|haben gelegt|
+|ihr|habt gelegt|
+|sie|haben gelegt|
+|Sie|haben gelegt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       fc3daac7-739a-4a99-9571-198aa48e60f8
+:END:
+|ich|legte|
+|du|legtest|
+|er|legte|
+|wir|legten|
+|ihr|legtet|
+|sie|legten|
+|Sie|legten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "handeln"
+:VERB_TRANSLATION: "deal;deal;deal;act;perform--to take action; to act"
+:ID:       7753dc6d-c4d8-43c3-83b2-232ee9a41832
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       0b97eaf4-e62a-4840-ab14-0ab1b01d6ffc
+:END:
+|ich|handle|
+|du|handelst|
+|er|handelt|
+|wir|handeln|
+|ihr|handelt|
+|sie|handeln|
+|Sie|handeln|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       b8995c0f-ae0e-4c7f-ade7-ed78445c0b06
+:END:
+|ich|habe gehandelt|
+|du|hast gehandelt|
+|er|hat gehandelt|
+|wir|haben gehandelt|
+|ihr|habt gehandelt|
+|sie|haben gehandelt|
+|Sie|haben gehandelt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       85363027-9e90-494c-9f58-b60fe347cc64
+:END:
+|ich|handelte|
+|du|handeltest|
+|er|handelte|
+|wir|handelten|
+|ihr|handeltet|
+|sie|handelten|
+|Sie|handelten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "erreichen"
+:VERB_TRANSLATION: "achieve;achieve;get;arrive;reach;reach;reach;reach;notch;attain--to carry out successfully; to accomplish"
+:ID:       0d3705ad-1cbd-4189-b340-9cedef56ae77
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       3eea7d28-d89e-48a2-bccb-081aba2ca9bc
+:END:
+|ich|erreiche|
+|du|erreichst|
+|er|erreicht|
+|wir|erreichen|
+|ihr|erreicht|
+|sie|erreichen|
+|Sie|erreichen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       79c42c29-c606-420f-a85b-e26da4d17d98
+:END:
+|ich|habe erreicht|
+|du|hast erreicht|
+|er|hat erreicht|
+|wir|haben erreicht|
+|ihr|habt erreicht|
+|sie|haben erreicht|
+|Sie|haben erreicht|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       999dbbbc-de05-4b3b-a42b-aca32b35ab08
+:END:
+|ich|erreichte|
+|du|erreichtest|
+|er|erreichte|
+|wir|erreichten|
+|ihr|erreichtet|
+|sie|erreichten|
+|Sie|erreichten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "schaffen"
+:VERB_TRANSLATION: "create;manage;manage;arrive;cope;fetch--to put into existence"
+:ID:       8ad72c2d-f5c8-4c87-b252-2e8087084ecd
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       89180332-9ba1-43a5-b219-16f6c40a5c10
+:END:
+|ich|schaffe|
+|du|schaffst|
+|er|schafft|
+|wir|schaffen|
+|ihr|schafft|
+|sie|schaffen|
+|Sie|schaffen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       601a682b-db24-4b93-a4dd-057b2f0c3213
+:END:
+|ich|habe geschaffen,geschafft|
+|du|hast geschaffen,geschafft|
+|er|hat geschaffen,geschafft|
+|wir|haben geschaffen,geschafft|
+|ihr|habt geschaffen,geschafft|
+|sie|haben geschaffen,geschafft|
+|Sie|haben geschaffen,geschafft|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       8d5ec65a-d96e-4780-8405-d1366cff96e2
+:END:
+|ich|schuf,schaffte|
+|du|schufst,schafftest|
+|er|schuf,schaffte|
+|wir|schufen,schafften|
+|ihr|schuft,schafftet|
+|sie|schufen,schafften|
+|Sie|schufen,schafften|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "darstellen Trennbare"
+:VERB_TRANSLATION: "depict;represent--null"
+:ID:       d09aab73-f3a9-4d10-a37f-75ffac862377
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       8a7f2db4-42f3-4540-a143-04407e9e9b63
+:END:
+|ich|stelle dar|
+|du|stellst dar|
+|er|stellt dar|
+|wir|stellen dar|
+|ihr|stellt dar|
+|sie|stellen dar|
+|Sie|stellen dar|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       4faf8267-8fe1-4ff0-a274-ec91592df701
+:END:
+|ich|habe dargestellt|
+|du|hast dargestellt|
+|er|hat dargestellt|
+|wir|haben dargestellt|
+|ihr|habt dargestellt|
+|sie|haben dargestellt|
+|Sie|haben dargestellt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       67058257-27f9-4635-bb7a-0073f3cbeaab
+:END:
+|ich|stellte dar|
+|du|stelltest dar|
+|er|stellte dar|
+|wir|stellten dar|
+|ihr|stelltet dar|
+|sie|stellten dar|
+|Sie|stellten dar|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "verlieren"
+:VERB_TRANSLATION: "abate;lose;lose;lose;lose;lose--to be defeated"
+:ID:       5c7e48ca-99db-4913-bdfa-904444c134c6
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       c6d4370a-7660-4351-bc4b-9b57d92bc1ee
+:END:
+|ich|verliere|
+|du|verlierst|
+|er|verliert|
+|wir|verlieren|
+|ihr|verliert|
+|sie|verlieren|
+|Sie|verlieren|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       6be4ac0d-e6a8-41bc-afa8-a6e91c8d6be7
+:END:
+|ich|habe verloren|
+|du|hast verloren|
+|er|hat verloren|
+|wir|haben verloren|
+|ihr|habt verloren|
+|sie|haben verloren|
+|Sie|haben verloren|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       187117b9-b713-410b-b40d-7f00b8fd7527
+:END:
+|ich|verlor|
+|du|verlorst|
+|er|verlor|
+|wir|verloren|
+|ihr|verlort|
+|sie|verloren|
+|Sie|verloren|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "erkennen"
+:VERB_TRANSLATION: "know;acknowledge;recognise;recognize;distinguish;realize;discern--have sexual relations with"
+:ID:       b6560c93-501d-487c-8ed3-b74c790e8217
+:END:
+*** 	 :drill:
+    SCHEDULED: <2016-04-20 Wed>
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       8509184c-d9bb-4d47-b721-78913033b6a7
+:DRILL_LAST_INTERVAL: 4.198
+:DRILL_REPEATS_SINCE_FAIL: 2
+:DRILL_TOTAL_REPEATS: 1
+:DRILL_FAILURE_COUNT: 0
+:DRILL_AVERAGE_QUALITY: 4.0
+:DRILL_EASE: 2.5
+:DRILL_LAST_QUALITY: 4
+:DRILL_LAST_REVIEWED: [2016-04-16 Sat 18:53]
+:END:
+|ich|erkenne|
+|du|erkennst|
+|er|erkennt|
+|wir|erkennen|
+|ihr|erkennt|
+|sie|erkennen|
+|Sie|erkennen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       9db99b35-467b-4be0-b7ab-529afec75281
+:END:
+|ich|habe erkannt|
+|du|hast erkannt|
+|er|hat erkannt|
+|wir|haben erkannt|
+|ihr|habt erkannt|
+|sie|haben erkannt|
+|Sie|haben erkannt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       61626f23-2fba-4f74-96c6-836913081976
+:END:
+|ich|erkannte|
+|du|erkanntest|
+|er|erkannte|
+|wir|erkannten|
+|ihr|erkanntet|
+|sie|erkannten|
+|Sie|erkannten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "entwickeln"
+:VERB_TRANSLATION: "develop;make;develop;develop;develop;originate;unfold--to create"
+:ID:       3bb37575-f834-4662-b42a-6aef3589ed72
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       edadf29b-0a86-4f2b-84fe-ffb93e9eb8d1
+:END:
+|ich|entwickle|
+|du|entwickelst|
+|er|entwickelt|
+|wir|entwickeln|
+|ihr|entwickelt|
+|sie|entwickeln|
+|Sie|entwickeln|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       9915fc18-4d3d-4517-a4a4-a6243381d2c1
+:END:
+|ich|habe entwickelt|
+|du|hast entwickelt|
+|er|hat entwickelt|
+|wir|haben entwickelt|
+|ihr|habt entwickelt|
+|sie|haben entwickelt|
+|Sie|haben entwickelt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       2d3cdfa9-8fd0-45ff-9064-880d7484eb8d
+:END:
+|ich|entwickelte|
+|du|entwickeltest|
+|er|entwickelte|
+|wir|entwickelten|
+|ihr|entwickeltet|
+|sie|entwickelten|
+|Sie|entwickelten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "anfangen Trennbare"
+:VERB_TRANSLATION: "begin;commence--To start, to initiate or take the first step into something."
+:ID:       3b9329f0-5476-4f15-985d-41004b09b169
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       39937a10-44a4-47ea-8b10-506b174a1c56
+:END:
+|ich|fange an|
+|du|fängst an|
+|er|fängt an|
+|wir|fangen an|
+|ihr|fangt an|
+|sie|fangen an|
+|Sie|fangen an|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       aed0984e-5b2f-47c8-9bde-1376dc4d9d46
+:END:
+|ich|habe angefangen|
+|du|hast angefangen|
+|er|hat angefangen|
+|wir|haben angefangen|
+|ihr|habt angefangen|
+|sie|haben angefangen|
+|Sie|haben angefangen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       5728702c-f6fb-43e4-a78f-e7d28465ceef
+:END:
+|ich|fing an|
+|du|fingst an|
+|er|fing an|
+|wir|fingen an|
+|ihr|fingt an|
+|sie|fingen an|
+|Sie|fingen an|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "ansehen Trennbare"
+:VERB_TRANSLATION: "deem;behold;esteem;watch--to hold as a personal opinion"
+:ID:       5e9b288b-3ff5-4303-8be7-d5835f60978a
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       c411d3e5-7d4f-4395-b1ea-b4d331646af9
+:END:
+|ich|sehe an|
+|du|siehst an|
+|er|sieht an|
+|wir|sehen an|
+|ihr|seht an|
+|sie|sehen an|
+|Sie|sehen an|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       2d6c991e-7c31-4ab4-aa2d-e1c57975d589
+:END:
+|ich|habe angesehen|
+|du|hast angesehen|
+|er|hat angesehen|
+|wir|haben angesehen|
+|ihr|habt angesehen|
+|sie|haben angesehen|
+|Sie|haben angesehen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       9863258e-b0f6-450c-812b-724cc7867855
+:END:
+|ich|sah an|
+|du|sah(e)st an|
+|er|sah an|
+|wir|sahen an|
+|ihr|saht an|
+|sie|sahen an|
+|Sie|sahen an|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "fahren"
+:VERB_TRANSLATION: "drive;drive;drive;fly;go;ride;ride;fare--operate (a wheeled motorized vehicle)"
+:ID:       fb09461c-8903-4e8f-b989-df013c7ef26d
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       c531f677-c12a-4580-b5a1-561e8c816f66
+:END:
+|ich|fahre|
+|du|fährst|
+|er|fährt|
+|wir|fahren|
+|ihr|fahrt|
+|sie|fahren|
+|Sie|fahren|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       a19c0f04-431e-4c5b-ab53-763fd8dc338f
+:END:
+|ich|bin gefahren|
+|du|bist gefahren|
+|er|ist gefahren|
+|wir|sind gefahren|
+|ihr|seid gefahren|
+|sie|sind gefahren|
+|Sie|sind gefahren|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       b76540d8-a11c-4dd7-b44a-57f4f8611db4
+:END:
+|ich|fuhr|
+|du|fuhrst|
+|er|fuhr|
+|wir|fuhren|
+|ihr|fuhrt|
+|sie|fuhren|
+|Sie|fuhren|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "nennen"
+:VERB_TRANSLATION: "name;name;name;disclose;state;call;designate;hight--to give a name to"
+:ID:       d0c111f5-3eb6-475c-87be-80154c921604
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       8549471c-c77d-43c5-bb56-e2f5c2646623
+:END:
+|ich|nenne|
+|du|nennst|
+|er|nennt|
+|wir|nennen|
+|ihr|nennt|
+|sie|nennen|
+|Sie|nennen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       0f214ad2-9781-4bf0-b662-384b9f42af68
+:END:
+|ich|habe genannt|
+|du|hast genannt|
+|er|hat genannt|
+|wir|haben genannt|
+|ihr|habt genannt|
+|sie|haben genannt|
+|Sie|haben genannt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       c2973ee4-5a48-452b-aeb8-cce87f511235
+:END:
+|ich|nannte|
+|du|nanntest|
+|er|nannte|
+|wir|nannten|
+|ihr|nanntet|
+|sie|nannten|
+|Sie|nannten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "erscheinen"
+:VERB_TRANSLATION: "appear;appear;appear;appear;appear--To come or be in sight; to be in view; to become visible"
+:ID:       5bfb6069-55bd-46c3-921a-3e2a40a1245f
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       d76aa4f2-844b-44be-8f98-fdf603e3b64c
+:END:
+|ich|erscheine|
+|du|erscheinst|
+|er|erscheint|
+|wir|erscheinen|
+|ihr|erscheint|
+|sie|erscheinen|
+|Sie|erscheinen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       c8df2cae-8099-4137-bc6e-bd9d97d1f5b9
+:END:
+|ich|bin erschienen|
+|du|bist erschienen|
+|er|ist erschienen|
+|wir|sind erschienen|
+|ihr|seid erschienen|
+|sie|sind erschienen|
+|Sie|sind erschienen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       2642d5d6-a2a3-4d18-bfaa-2a23d9b067c1
+:END:
+|ich|erschien|
+|du|erschienst|
+|er|erschien|
+|wir|erschienen|
+|ihr|erschient|
+|sie|erschienen|
+|Sie|erschienen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "aussehen Trennbare"
+:VERB_TRANSLATION: "look;appear--to appear, to seem"
+:ID:       04b28cf8-d92a-41c1-af0d-335d84247d16
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       752ca416-f8a0-477d-bd9d-9c9c5439b9f1
+:END:
+|ich|sehe aus|
+|du|siehst aus|
+|er|sieht aus|
+|wir|sehen aus|
+|ihr|seht aus|
+|sie|sehen aus|
+|Sie|sehen aus|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       7cdf5495-e402-44af-9ddf-57580018749f
+:END:
+|ich|habe ausgesehen|
+|du|hast ausgesehen|
+|er|hat ausgesehen|
+|wir|haben ausgesehen|
+|ihr|habt ausgesehen|
+|sie|haben ausgesehen|
+|Sie|haben ausgesehen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       06ca018a-0747-416f-8dc7-02f79a6395f5
+:END:
+|ich|sah aus|
+|du|sah(e)st aus|
+|er|sah aus|
+|wir|sahen aus|
+|ihr|saht aus|
+|sie|sahen aus|
+|Sie|sahen aus|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "fühlen"
+:VERB_TRANSLATION: "feel;feel;feel--transitive: to sense by touch"
+:ID:       f257c200-5ff1-4953-b2e3-c2fd91fca2ca
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       bf2ff860-004e-4945-8699-deaa080ee966
+:END:
+|ich|fühle|
+|du|fühlst|
+|er|fühlt|
+|wir|fühlen|
+|ihr|fühlt|
+|sie|fühlen|
+|Sie|fühlen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       66a44e71-bb0b-4297-a8c1-1d5fc7e1a2cc
+:END:
+|ich|habe gefühlt|
+|du|hast gefühlt|
+|er|hat gefühlt|
+|wir|haben gefühlt|
+|ihr|habt gefühlt|
+|sie|haben gefühlt|
+|Sie|haben gefühlt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       de902e57-4567-42f9-b63b-d9c2412a4c0f
+:END:
+|ich|fühlte|
+|du|fühltest|
+|er|fühlte|
+|wir|fühlten|
+|ihr|fühltet|
+|sie|fühlten|
+|Sie|fühlten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "bieten"
+:VERB_TRANSLATION: "feature;bid;bid--ascribe the greatest importance"
+:ID:       139548be-a0ea-42d3-87d4-604f4ddfb183
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       178a2de8-3dd5-448b-ab4c-71011dc24cd0
+:END:
+|ich|biete|
+|du|bietest|
+|er|bietet|
+|wir|bieten|
+|ihr|bietet|
+|sie|bieten|
+|Sie|bieten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       1e0f027b-11c8-4ba4-854e-c6aeeeef9a1d
+:END:
+|ich|habe geboten|
+|du|hast geboten|
+|er|hat geboten|
+|wir|haben geboten|
+|ihr|habt geboten|
+|sie|haben geboten|
+|Sie|haben geboten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       d69aa7f5-8446-410b-a102-b29510eed1cf
+:END:
+|ich|bot|
+|du|botest|
+|er|bot|
+|wir|boten|
+|ihr|botet|
+|sie|boten|
+|Sie|boten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "anbieten Trennbare"
+:VERB_TRANSLATION: "quote;advertise;volunteer--to prepare a summary of work to be done and set a price"
+:ID:       cdcb0c3e-9c12-48c3-a812-54be202d203a
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       87254863-5177-45ef-b5da-bd99cbf98080
+:END:
+|ich|biete an|
+|du|bietest an|
+|er|bietet an|
+|wir|bieten an|
+|ihr|bietet an|
+|sie|bieten an|
+|Sie|bieten an|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       7d5a659f-cd81-4664-9227-61967c29a421
+:END:
+|ich|habe angeboten|
+|du|hast angeboten|
+|er|hat angeboten|
+|wir|haben angeboten|
+|ihr|habt angeboten|
+|sie|haben angeboten|
+|Sie|haben angeboten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       2212cd83-54e9-4506-98fc-96b6327e520d
+:END:
+|ich|bot an|
+|du|botest an|
+|er|bot an|
+|wir|boten an|
+|ihr|botet an|
+|sie|boten an|
+|Sie|boten an|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "ergeben"
+:VERB_TRANSLATION: "cause;yield--to produce as a result"
+:ID:       31584dd5-ab4b-44ad-ace7-cd4bcefd5f45
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       914a727c-17fc-4d0b-82cf-922887658f37
+:END:
+|ich|ergebe|
+|du|ergibst|
+|er|ergibt|
+|wir|ergeben|
+|ihr|ergebt|
+|sie|ergeben|
+|Sie|ergeben|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       887ee7b6-fa1a-447a-a43c-51717d971af4
+:END:
+|ich|habe ergeben|
+|du|hast ergeben|
+|er|hat ergeben|
+|wir|haben ergeben|
+|ihr|habt ergeben|
+|sie|haben ergeben|
+|Sie|haben ergeben|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       862541b4-b3fc-4d3a-83c8-94fd45cfc246
+:END:
+|ich|ergab|
+|du|ergabst|
+|er|ergab|
+|wir|ergaben|
+|ihr|ergabt|
+|sie|ergaben|
+|Sie|ergaben|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "erinnern"
+:VERB_TRANSLATION: "remember;remind;recall--to recall from one's memory"
+:ID:       5569fdc2-8944-46ce-800c-a676121c4b9a
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       645205e1-1945-4183-a84c-41cd5e1d900e
+:END:
+|ich|erinnere,erinnre|
+|du|erinnerst|
+|er|erinnert|
+|wir|erinnern|
+|ihr|erinnert|
+|sie|erinnern|
+|Sie|erinnern|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       5243e26a-ee5a-478a-aa8e-5395c6abd9d1
+:END:
+|ich|habe erinnert|
+|du|hast erinnert|
+|er|hat erinnert|
+|wir|haben erinnert|
+|ihr|habt erinnert|
+|sie|haben erinnert|
+|Sie|haben erinnert|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       d2916019-253e-460f-af75-9fc101e9af21
+:END:
+|ich|erinnerte|
+|du|erinnertest|
+|er|erinnerte|
+|wir|erinnerten|
+|ihr|erinnertet|
+|sie|erinnerten|
+|Sie|erinnerten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "bedeuten"
+:VERB_TRANSLATION: "imply;spell;connote;connote;denote;mean;portend;signify;mean;mean--to express suggestively rather than as a direct statement"
+:ID:       bbe9dc6b-4db9-47a5-82c7-16fb423ddb3a
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       561712ae-1717-4d18-bfca-1638b4b950ed
+:END:
+|ich|bedeute|
+|du|bedeutest|
+|er|bedeutet|
+|wir|bedeuten|
+|ihr|bedeutet|
+|sie|bedeuten|
+|Sie|bedeuten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       d494db93-50b1-4a85-9e1b-67de52903230
+:END:
+|ich|habe bedeutet|
+|du|hast bedeutet|
+|er|hat bedeutet|
+|wir|haben bedeutet|
+|ihr|habt bedeutet|
+|sie|haben bedeutet|
+|Sie|haben bedeutet|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       e7af9200-11b3-4091-ad92-a6e74a745045
+:END:
+|ich|bedeutete|
+|du|bedeutetest|
+|er|bedeutete|
+|wir|bedeuteten|
+|ihr|bedeutetet|
+|sie|bedeuteten|
+|Sie|bedeuteten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "vergleichen"
+:VERB_TRANSLATION: "compare;collate;collate;liken--to assess the similarities between two things or between one thing and another"
+:ID:       b5e0e449-b721-4cea-a691-a55c21bbd8dc
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       3a5fdeec-60fa-4385-a410-77f81d2ca325
+:END:
+|ich|vergleiche|
+|du|vergleichst|
+|er|vergleicht|
+|wir|vergleichen|
+|ihr|vergleicht|
+|sie|vergleichen|
+|Sie|vergleichen|
+*** 	 :drill:
+    SCHEDULED: <2016-04-20 Wed>
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       61d6fbc1-dcbc-4796-a8f4-8643422ad6ee
+:DRILL_LAST_INTERVAL: 4.0651
+:DRILL_REPEATS_SINCE_FAIL: 2
+:DRILL_TOTAL_REPEATS: 1
+:DRILL_FAILURE_COUNT: 0
+:DRILL_AVERAGE_QUALITY: 3.0
+:DRILL_EASE: 2.36
+:DRILL_LAST_QUALITY: 3
+:DRILL_LAST_REVIEWED: [2016-04-16 Sat 18:54]
+:END:
+|ich|habe verglichen|
+|du|hast verglichen|
+|er|hat verglichen|
+|wir|haben verglichen|
+|ihr|habt verglichen|
+|sie|haben verglichen|
+|Sie|haben verglichen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       ae2cf14b-ee51-400b-84e5-a4af37966f9e
+:END:
+|ich|verglich|
+|du|verglichst|
+|er|verglich|
+|wir|verglichen|
+|ihr|verglicht|
+|sie|verglichen|
+|Sie|verglichen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "fliegen"
+:VERB_TRANSLATION: "fly;fly;go;hurtle--to travel through air"
+:ID:       c7bdd093-4f13-45da-882e-654d1f6c31ef
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       b05df6ea-7e88-440e-9294-bc1fc3f9d730
+:END:
+|ich|fliege|
+|du|fliegst|
+|er|fliegt|
+|wir|fliegen|
+|ihr|fliegt|
+|sie|fliegen|
+|Sie|fliegen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       cebb59a9-f007-431f-b07b-03ea40083dae
+:END:
+|ich|bin geflogen|
+|du|bist geflogen|
+|er|ist geflogen|
+|wir|sind geflogen|
+|ihr|seid geflogen|
+|sie|sind geflogen|
+|Sie|sind geflogen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       7a900412-58fe-426c-b92c-e59456895e2a
+:END:
+|ich|flog|
+|du|flogst|
+|er|flog|
+|wir|flogen|
+|ihr|flogt|
+|sie|flogen|
+|Sie|flogen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "kosten"
+:VERB_TRANSLATION: "cost;taste;try;sample--to incur a charge, a price"
+:ID:       2c917c23-ea95-4f0a-a7a6-eddd73375926
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       78d16ff6-ae72-418b-8e24-151dc5109c78
+:END:
+|ich|koste|
+|du|kostest|
+|er|kostet|
+|wir|kosten|
+|ihr|kostet|
+|sie|kosten|
+|Sie|kosten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       9525e004-9777-42a7-ab24-550ea43232d0
+:END:
+|ich|habe gekostet|
+|du|hast gekostet|
+|er|hat gekostet|
+|wir|haben gekostet|
+|ihr|habt gekostet|
+|sie|haben gekostet|
+|Sie|haben gekostet|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       90221553-e6df-462c-8967-e9c90dd60260
+:END:
+|ich|kostete|
+|du|kostetest|
+|er|kostete|
+|wir|kosteten|
+|ihr|kostetet|
+|sie|kosteten|
+|Sie|kosteten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "öffnen"
+:VERB_TRANSLATION: "loose;undo;deploy--to unfasten"
+:ID:       804b0570-3f34-40f6-9840-7381e2b4ec08
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       c2f51b4d-cd85-44d3-990f-cdc9bfb74a39
+:END:
+|ich|öffne|
+|du|öffnest|
+|er|öffnet|
+|wir|öffnen|
+|ihr|öffnet|
+|sie|öffnen|
+|Sie|öffnen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       c95ba3ff-eba5-41d7-a3c9-bcf9288cce2e
+:END:
+|ich|habe geöffnet|
+|du|hast geöffnet|
+|er|hat geöffnet|
+|wir|haben geöffnet|
+|ihr|habt geöffnet|
+|sie|haben geöffnet|
+|Sie|haben geöffnet|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       3c8e87d5-b9c5-40ba-ae9d-cb87facee8ef
+:END:
+|ich|öffnete|
+|du|öffnetest|
+|er|öffnete|
+|wir|öffneten|
+|ihr|öffnetet|
+|sie|öffneten|
+|Sie|öffneten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "probieren"
+:VERB_TRANSLATION: "taste;try;try;assay;sample--to sample the flavor of something"
+:ID:       8643c34e-e43f-4d73-8a38-4e35ec023c32
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       8497fc26-42d2-4c80-8b1d-ebda1be491b0
+:END:
+|ich|probiere|
+|du|probierst|
+|er|probiert|
+|wir|probieren|
+|ihr|probiert|
+|sie|probieren|
+|Sie|probieren|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       748320ef-4a14-40fc-8f9f-5c431953efa1
+:END:
+|ich|habe probiert|
+|du|hast probiert|
+|er|hat probiert|
+|wir|haben probiert|
+|ihr|habt probiert|
+|sie|haben probiert|
+|Sie|haben probiert|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       3e46c6db-4a21-4afb-b520-19112f7f8086
+:END:
+|ich|probierte|
+|du|probiertest|
+|er|probierte|
+|wir|probierten|
+|ihr|probiertet|
+|sie|probierten|
+|Sie|probierten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "vergessen"
+:VERB_TRANSLATION: "forget;forget;forget;forget--to lose remembrance of"
+:ID:       67418e5f-99ab-4839-b30b-9e52c5ef22b1
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       8e4d23dd-429f-4d77-a885-4724f320f2ef
+:END:
+|ich|vergesse|
+|du|vergisst|
+|er|vergisst|
+|wir|vergessen|
+|ihr|vergesst|
+|sie|vergessen|
+|Sie|vergessen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       70f1a530-eb7e-46ba-ab11-88ff0e998f12
+:END:
+|ich|habe vergessen|
+|du|hast vergessen|
+|er|hat vergessen|
+|wir|haben vergessen|
+|ihr|habt vergessen|
+|sie|haben vergessen|
+|Sie|haben vergessen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       44bbd58a-1303-4183-836d-c135d0dad579
+:END:
+|ich|vergaß|
+|du|vergaßest|
+|er|vergaß|
+|wir|vergaßen|
+|ihr|vergaßt|
+|sie|vergaßen|
+|Sie|vergaßen|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "freuen"
+:VERB_TRANSLATION: "rejoice;gladden--be happy"
+:ID:       e035e74c-cf03-4e65-825f-a7cc110d155f
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       b0f2e80a-e970-4bd7-82d8-04f4c77bb8d3
+:END:
+|ich|freue|
+|du|freust|
+|er|freut|
+|wir|freuen|
+|ihr|freut|
+|sie|freuen|
+|Sie|freuen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       7c051eab-09ed-4c3f-a451-5fe670e81e3e
+:END:
+|ich|habe gefreut|
+|du|hast gefreut|
+|er|hat gefreut|
+|wir|haben gefreut|
+|ihr|habt gefreut|
+|sie|haben gefreut|
+|Sie|haben gefreut|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       89bef203-a50d-4898-9572-9f2177fe7b2f
+:END:
+|ich|freute|
+|du|freutest|
+|er|freute|
+|wir|freuten|
+|ihr|freutet|
+|sie|freuten|
+|Sie|freuten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "vorschlagen"
+:VERB_TRANSLATION: "counsel;suggest;suggest;propose--to recommend"
+:ID:       5f776913-e7da-4688-af59-9c25140490dd
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       0ce4ddf7-8b7e-4b83-997a-9ad3da5ed1b9
+:END:
+|ich|schlage vor|
+|du|schlägst vor|
+|er|schlägt vor|
+|wir|schlagen vor|
+|ihr|schlagt vor|
+|sie|schlagen vor|
+|Sie|schlagen vor|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       9250dafe-13aa-4188-b637-adbe8d49cd59
+:END:
+|ich|habe vorgeschlagen|
+|du|hast vorgeschlagen|
+|er|hat vorgeschlagen|
+|wir|haben vorgeschlagen|
+|ihr|habt vorgeschlagen|
+|sie|haben vorgeschlagen|
+|Sie|haben vorgeschlagen|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       bcc5a047-95c1-4ed6-a64a-24f8934ded46
+:END:
+|ich|schlug vor|
+|du|schlugst vor|
+|er|schlug vor|
+|wir|schlugen vor|
+|ihr|schlugt vor|
+|sie|schlugen vor|
+|Sie|schlugen vor|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "schicken"
+:VERB_TRANSLATION: "send;behoove--make something go somewhere"
+:ID:       58f54b17-947c-4e13-b799-5d66acba13e9
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       6c66be09-4b8a-42d1-a409-8f36609d62e2
+:END:
+|ich|schicke|
+|du|schickst|
+|er|schickt|
+|wir|schicken|
+|ihr|schickt|
+|sie|schicken|
+|Sie|schicken|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       8fde6b77-aaf6-45cf-82e1-664e0b8b88d6
+:END:
+|ich|habe geschickt|
+|du|hast geschickt|
+|er|hat geschickt|
+|wir|haben geschickt|
+|ihr|habt geschickt|
+|sie|haben geschickt|
+|Sie|haben geschickt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       dd67df45-93a3-4961-b2e6-a1fdcfeac09e
+:END:
+|ich|schickte|
+|du|schicktest|
+|er|schickte|
+|wir|schickten|
+|ihr|schicktet|
+|sie|schickten|
+|Sie|schickten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "drücken"
+:VERB_TRANSLATION: "shrink;push;push;push;squeeze;print;press;snuggle;hug;reprint--intransitive: to attempt to avoid an unwanted or intimidating duty"
+:ID:       fa0f1a47-ed92-45bb-8b50-d1d6f49123f7
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       8d29433f-a4db-406a-a0e9-d149aae51bec
+:END:
+|ich|drücke|
+|du|drückst|
+|er|drückt|
+|wir|drücken|
+|ihr|drückt|
+|sie|drücken|
+|Sie|drücken|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       c7afa68d-4060-4388-97fc-c3c84205261a
+:END:
+|ich|habe gedrückt|
+|du|hast gedrückt|
+|er|hat gedrückt|
+|wir|haben gedrückt|
+|ihr|habt gedrückt|
+|sie|haben gedrückt|
+|Sie|haben gedrückt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       a9c07ba7-d852-4cfc-8128-9de7da767e2e
+:END:
+|ich|drückte|
+|du|drücktest|
+|er|drückte|
+|wir|drückten|
+|ihr|drücktet|
+|sie|drückten|
+|Sie|drückten|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "übersetzen"
+:VERB_TRANSLATION: "translate;interpret--to change text from one language to another"
+:ID:       6eb94f16-9524-4d0f-aeca-10bef2de979a
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       1c4b4754-3627-4d37-a807-69f6331405ba
+:END:
+|ich|übersetze,setze über|
+|du|übersetzt,setzt über|
+|er|übersetzt,setzt über|
+|wir|übersetzen,setzen über|
+|ihr|übersetzt,setzt über|
+|sie|übersetzen,setzen über|
+|Sie|übersetzen,setzen über|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       4a1ff74c-dd63-471d-9591-5a94ddd2a2fe
+:END:
+|ich|habe übersetzt,übergesetzt|
+|du|hast übersetzt,übergesetzt|
+|er|hat übersetzt,übergesetzt|
+|wir|haben übersetzt,übergesetzt|
+|ihr|habt übersetzt,übergesetzt|
+|sie|haben übersetzt,übergesetzt|
+|Sie|haben übersetzt,übergesetzt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       6dc7d7eb-525b-4e2e-937e-f06db3ab9071
+:END:
+|ich|übersetzte,setzte über|
+|du|übersetztest,setztest über|
+|er|übersetzte,setzte über|
+|wir|übersetzten,setzten über|
+|ihr|übersetztet,setztet über|
+|sie|übersetzten,setzten über|
+|Sie|übersetzten,setzten über|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "anmelden"
+:VERB_TRANSLATION: "enroll--to enter (a name) in a register, roll or list"
+:ID:       07d882e0-c792-43b7-b893-57a2952e1c25
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       5b7e29e9-22cc-40e6-be51-59c5a70d5ba7
+:END:
+|ich|melde an|
+|du|meldest an|
+|er|meldet an|
+|wir|melden an|
+|ihr|meldet an|
+|sie|melden an|
+|Sie|melden an|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       bb83dfaa-c2db-4c44-a3e4-941a3ac8a15c
+:END:
+|ich|habe angemeldet|
+|du|hast angemeldet|
+|er|hat angemeldet|
+|wir|haben angemeldet|
+|ihr|habt angemeldet|
+|sie|haben angemeldet|
+|Sie|haben angemeldet|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       f6326f30-255b-43b9-afb1-c32101cd2f3b
+:END:
+|ich|meldete an|
+|du|meldetest an|
+|er|meldete an|
+|wir|meldeten an|
+|ihr|meldetet an|
+|sie|meldeten an|
+|Sie|meldeten an|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "auswählen Trennbare"
+:VERB_TRANSLATION: "choose;draft;select--to pick"
+:ID:       1507a15b-03ec-42ea-ba7d-0fb8c6526eba
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       af0244de-3d26-4c6e-bdcb-c53d3f59015e
+:END:
+|ich|wähle aus|
+|du|wählst aus|
+|er|wählt aus|
+|wir|wählen aus|
+|ihr|wählt aus|
+|sie|wählen aus|
+|Sie|wählen aus|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       498e6b70-b184-46dc-b886-5d5d128ecb19
+:END:
+|ich|habe ausgewählt|
+|du|hast ausgewählt|
+|er|hat ausgewählt|
+|wir|haben ausgewählt|
+|ihr|habt ausgewählt|
+|sie|haben ausgewählt|
+|Sie|haben ausgewählt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       30895d31-8428-42f2-b003-03fc09eab043
+:END:
+|ich|wählte aus|
+|du|wähltest aus|
+|er|wählte aus|
+|wir|wählten aus|
+|ihr|wähltet aus|
+|sie|wählten aus|
+|Sie|wählten aus|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "unterhalten"
+:VERB_TRANSLATION: "chat;chat;entertain;entertain;enforce;maintain--be engaged in informal conversation"
+:ID:       685306e7-e4d7-4108-a518-805e2956e1a3
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       e0780b4e-3699-49d9-bffb-02172bf9ec93
+:END:
+|ich|unterhalte,halte unter|
+|du|unterhältst,hältst unter|
+|er|unterhält,hält unter|
+|wir|unterhalten,halten unter|
+|ihr|unterhaltet,haltet unter|
+|sie|unterhalten,halten unter|
+|Sie|unterhalten,halten unter|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       abe3329a-eee2-423d-9f48-c708f3cc9a7b
+:END:
+|ich|habe unterhalten,untergehalten|
+|du|hast unterhalten,untergehalten|
+|er|hat unterhalten,untergehalten|
+|wir|haben unterhalten,untergehalten|
+|ihr|habt unterhalten,untergehalten|
+|sie|haben unterhalten,untergehalten|
+|Sie|haben unterhalten,untergehalten|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       5ee78fcf-b319-45c5-b750-c977e4a4d13c
+:END:
+|ich|unterhielt,hielt unter|
+|du|unterhieltest,hieltest unter|
+|er|unterhielt,hielt unter|
+|wir|unterhielten,hielten unter|
+|ihr|unterhieltet,hieltet unter|
+|sie|unterhielten,hielten unter|
+|Sie|unterhielten,hielten unter|
+** Verb 	 :drill:
+:PROPERTIES:
+:DRILL_CARD_TYPE: conjugate
+:VERB_INFINITIVE: "stattfinden"
+:VERB_TRANSLATION: "happen--to occur"
+:ID:       f78eddbb-f6d4-4c9a-8907-4c18ddc541c3
+:END:
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "present"
+:ID:       3a3323ed-f8f2-47d4-9afc-ce1b37dd84f5
+:END:
+|ich|finde statt|
+|du|findest statt|
+|er|findet statt|
+|wir|finden statt|
+|ihr|findet statt|
+|sie|finden statt|
+|Sie|finden statt|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "perfect"
+:ID:       13382229-2d02-4ed7-8763-fb93a9ec0932
+:END:
+|ich|habe stattgefunden|
+|du|hast stattgefunden|
+|er|hat stattgefunden|
+|wir|haben stattgefunden|
+|ihr|habt stattgefunden|
+|sie|haben stattgefunden|
+|Sie|haben stattgefunden|
+*** 	 :drill:
+:PROPERTIES:
+:VERB_TENSE: "past"
+:ID:       a252c9dc-9477-40a5-a7c1-62d663904365
+:END:
+|ich|fand statt|
+|du|fandest statt|
+|er|fand statt|
+|wir|fanden statt|
+|ihr|fandet statt|
+|sie|fanden statt|
+|Sie|fanden statt|

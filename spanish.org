@@ -1,0 +1,181 @@
+# -*- mode: org; coding: utf-8 -*-
+#+STARTUP: showall
+
+# examples of card definitions for use with org-drill.
+# Cards, AKA topics, have the 'drill' tag. Note that the higher-level headings
+# in the file do NOT have this tag.
+
+* Spanish questions
+
+** Greetings
+
+# Simple cards. When each card is presented, all subheadings are collapsed, but
+# the text under the topic's main heading remains visible.
+
+*** Greeting 1                                       :drill:
+
+Translate into Spanish:
+What is your name? (formal)
+
+**** Answer
+
+¿Cómo se llama usted?
+
+**** Notes
+
+llamar = to be named
+
+*** Greeting 2                                       :drill:
+
+Translate into Spanish:
+What is your name? (informal)
+
+**** Answer
+
+¿Cómo te llamas?
+
+**** Notes
+
+llamar = to be named
+
+
+** Grammar rules
+
+# More simple cards -- here the question and answer are produced purely using
+# cloze deletion of test in [square brackets], without the need to hide any
+# subtopics (though they WILL still be hidden if present).
+
+# If the text between the brackets contains a `|' character, everything after
+# that character is considered to be a `hint', and will remain visible when the
+# rest of the clozed text is hidden.
+
+# Set the variable `org-drill-use-visible-cloze-face-p' to `t' if you want 
+# cloze-deleted text to be shown in a special face when you are editing org
+# mode buffers.
+
+*** Grammar Rule                                     :drill:
+
+To make the plural of an adjective ending in [a stressed vowel or a consonant 
+other than -z], add /-es/.
+
+*** Grammar Rule                                     :drill:
+
+To form an adverb from an adjective, add [-mente] to the [feminine|gender] 
+form of the adjective.
+
+** Vocabulary
+
+# Examples of 'twosided' cards. These are 'flip cards' where one of the
+# first 2 'sides' (subheadings) is presented at random, while all others stay
+# hidden. 
+
+# There is another builtin card type called 'multisided'. These are like
+# 'twosided' cards, but can have any number of sides. So we could extend the
+# examples below by changing their type to multisided and adding a third
+# subheading which contains an inline image.
+
+
+*** Noun                                             :drill:
+    :PROPERTIES:
+    :DRILL_CARD_TYPE: twosided
+    :END:
+
+Translate this word.
+
+**** Spanish
+
+el gato
+
+**** English
+
+the cat
+
+**** Example sentence
+
+*El gato* se sentó en la estera.
+*The cat* sat on the mat.
+
+
+*** Noun                                             :drill:
+    :PROPERTIES:
+    :DRILL_CARD_TYPE: twosided
+    :END:
+
+Translate this word.
+
+**** Spanish
+
+el perro
+
+**** English
+
+the dog
+
+**** Example sentence
+
+Cuidado con *el perro*. 
+Beware of *the dog*.
+
+
+*** Adjective                                        :drill:
+    :PROPERTIES:
+    :DRILL_CARD_TYPE: twosided
+    :END:
+
+Translate this word.
+
+**** Spanish
+
+caliente
+
+**** English 
+
+hot
+
+**** Example sentence
+
+El agua está muy caliente.
+The water is very hot.
+
+
+** Verbs
+
+# An example of a special card type. The information in "spanish_verb" topics
+# can be presented in any of several different ways -- see the function
+# `org-drill-present-spanish-verb'.
+
+*** Verb                                             :drill:
+    :PROPERTIES:
+    :DRILL_CARD_TYPE: spanish_verb
+    :END:
+
+**** Infinitive
+
+cantar
+
+**** English
+
+to sing
+
+**** Present Tense
+
+| yo canto  | nosotros cantamos |
+| tú cantas | vosotros cantáis  |
+| él canta  | ellos cantan      |
+
+**** Past Tense
+
+| yo canté    | nosotros cantamos   |
+| tú cantaste | vosotros cantasteis |
+| él cantó    | ellos cantaron      |
+
+**** Future Perfect Tense
+
+| yo cantaré  | nosotros cantaremos |
+| tú cantarás | vosotros cantaréis  |
+| él cantarán | ellos cantarán      |
+
+
+**** Notes
+
+Regular verb.
