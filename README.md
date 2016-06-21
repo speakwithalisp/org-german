@@ -1,0 +1,3 @@
+# org-german
+List of org files and (maybe in the future) scripts that contain material for org-drill
+The two org-files, german-nouns.org and german-verbs.org, contain org-entries that org-drill can parse directly and present out-of-the-box; just make sure you let org-drill know where the files are. The rest are some snippets of code I used to get verbs from around the interwebs and format into the german-verbs.org file. They are very ugly and extremely hacky so any suggestions for improvement would be greatly appreciated. If anyone is interested, as I was, in drilling articles and verb conjugations into their heads and found no satisfactory means to do so, I hope this helps.
